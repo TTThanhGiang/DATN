@@ -1,15 +1,22 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+from dotenv import load_dotenv
+
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from pydantic import EmailStr
+from itsdangerous import URLSafeTimedSerializer
 
 from api.database import get_db
 from api.models import NguoiDung
 import api.schemas as schemas
 
+load_dotenv()
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
 
@@ -19,10 +26,26 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/dang-nhap")
 # cấu hình mã hóa mật khẩu
 bo_ma_hoa = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# cấu hình gửi email
+conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT")),
+    MAIL_SERVER=os.getenv("MAIL_SERVER"),
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+)
+
+fm = FastMail(conf)
+
 # cấu hình JWT
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+
+serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 def ma_hoa_mat_khau(mat_khau: str):
     return bo_ma_hoa.hash(mat_khau)
@@ -43,7 +66,11 @@ def tao_access_token(data: dict, thoi_han: timedelta = None):
 def gai_ma_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return schemas.TokenData(so_dien_thoai=payload.get("sub"), vai_Tro=payload.get("vai_tro"))
+        return {
+            "so_dien_thoai": payload.get("sub"),
+            "user_id": payload.get("user_id"),
+            "vai_tro": payload.get("vai_tro")
+        }
     except JWTError:
         return None
 
@@ -56,13 +83,30 @@ def lay_nguoi_dung_hien_tai(token: str = Depends(oauth2_scheme), db: Session = D
     token_data = gai_ma_token(token)
     if token_data is None:
         raise credentials_exception
-    nguoi_dung = lay_nguoi_dung_theo_sdt(db, token_data.so_dien_thoai)
+    so_dien_thoai = token_data.get("so_dien_thoai")
+
+    if not so_dien_thoai:
+        raise credentials_exception
+    nguoi_dung = lay_nguoi_dung_theo_sdt(db, so_dien_thoai)
     if nguoi_dung is None:
         raise credentials_exception
     return nguoi_dung
 
 def lay_nguoi_dung_theo_sdt(db: Session, sdt: str):
     return db.query(NguoiDung).filter(NguoiDung.so_dien_thoai == sdt).first()
+
+async def gui_email_xac_thuc(email: schemas.EmailSchema, ho_ten: str):
+    token = serializer.dumps(email, salt="email-confirm")
+    link = f"http://localhost:8000/auth/xac-thuc-email/{token}"
+
+    message = MessageSchema(
+        subject="Xác thực email",
+        recipients=[email],
+        body=f"Chào {ho_ten}, nhấp vào link để xác thực email: {link}",
+        subtype="html"
+    )
+
+    await fm.send_message(message)
 
 #---API Endpoints---#
 
@@ -73,11 +117,25 @@ def dang_nhap(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = De
     if not nguoi_dung or not kiem_tra_mat_khau(form_data.password, nguoi_dung.mat_khau):
         raise HTTPException(status_code=400, detail="Số điện thoại hoặc mật khẩu không đúng")
     
-    access_token = tao_access_token(data={"sub": nguoi_dung.so_dien_thoai, "vai_tro": nguoi_dung.vai_tro})
-    return {"access_token": access_token, "token_type": "bearer"}
+    if not nguoi_dung.trang_thai:
+        raise HTTPException(status_code=400, detail="Vui lòng xác thực email trước khi đăng nhập")
+    
+    access_token = tao_access_token(
+        data={
+            "sub": nguoi_dung.so_dien_thoai,
+            "user_id": nguoi_dung.ma_nguoi_dung,
+            "vai_tro": nguoi_dung.vai_tro
+        }
+    )
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "vai_tro": nguoi_dung.vai_tro,  
+        "ma_nguoi_dung": nguoi_dung.ma_nguoi_dung,
+        }
 
-@router.post("/dang-ky", response_model=schemas.UserResponse)
-def dang_ky(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+@router.post("/dang-ky")
+def dang_ky(user_in: schemas.UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if db.query(NguoiDung).filter((NguoiDung.so_dien_thoai == user_in.so_dien_thoai) | (NguoiDung.email == user_in.email)).first():
         raise HTTPException(status_code=400, detail="Số điện thoại hoặc email đã tồn tại")
     
@@ -92,7 +150,10 @@ def dang_ky(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(nguoi_dung_moi)
     db.commit()
     db.refresh(nguoi_dung_moi)
-    return nguoi_dung_moi
+
+    background_tasks.add_task(gui_email_xac_thuc, nguoi_dung_moi.email, nguoi_dung_moi.ho_ten)
+
+    return {"message": "Đăng ký thành công! Vui lòng kiểm tra email để xác thực."}
 
 
 @router.get("/me", response_model=schemas.UserResponse)
@@ -115,3 +176,20 @@ def cap_nhat_thong_tin(user_update: schemas.UserBase, db: Session = Depends(get_
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get("/xac-thuc-email/{token}")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    try:
+        email = serializer.loads(token, salt="email-confirm", max_age=3600)  # 1h
+    except:
+        raise HTTPException(status_code=400, detail="Link xác thực không hợp lệ hoặc hết hạn")
+
+    user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Người dùng không tồn tại")
+
+    user.trang_thai = True  # Kích hoạt tài khoản
+    db.commit()
+
+    return RedirectResponse(url="http://localhost:5173", status_code=302)

@@ -1,14 +1,39 @@
-import { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Box, IconButton, Typography } from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
+import { useState, useEffect } from "react";
 
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import Sidebar from "./components/SideBar";
-import HomePage from "./pages/Home/Home";
-import ProductDetail from "./pages/Products/ProductDetail";
-import { Label, LabelOutlined } from "@mui/icons-material";
+// User components
+import HomePage from "./pages/User/Home/Home";
+import ProductDetail from "./pages/User/Products/ProductDetail";
+import Cart from "./pages/User/Checkout/Cart";
+import UserLayout from "./layout/UserLayout";
+import Category from "./pages/User/Category/Category";
+import ProductListPage from "./pages/User/Products/Products";
+
+// Admin components
+import AdminLayout from "./layout/AdminLayout";
+import Dashboard from "./pages/Admin/Dashboard";
+import QuanLyTaiKhoan from "./pages/Admin/QuanLyTaiKhoan";
+import QuanLyChiNhanh from "./pages/Admin/QuanLyChiNhanh";
+import QuanLyDanhMuc from "./pages/Admin/QuanLyDanhMuc";
+import QuanLySanPham from "./pages/Admin/QuanLySanPham";
+import AdminQuanLyTonKho from "./pages/Admin/QuanLyTonKho";
+import QuanLyDanhGia from "./pages/Admin/QuanLyDanhGia";
+import AdminYeuCauNhapHang from "./pages/Admin/YeuCauNhapHang";
+import AdminQuanLyKhuyenMai from "./pages/Admin/QuanLyKhuyenMai";
+
+// Manage pages
+import QuanLyNhanVien from "./pages/BranchManager/EmployeeManage";
+import QuanLyKhuyenMai from "./pages/BranchManager/PromotionManage";
+import QuanLyDonHang from "./pages/BranchManager/OrderManage";
+import QuanLyTonKho from "./pages/BranchManager/QuanLyTonKho";
+import QuanLyYeuCauNhapHang from "./pages/BranchManager/YeuCauNhapHang";
+
+// Manage staff
+import OrderManageStaff from "./pages/Staff/OrderManage";
+import Profile from "./pages/Staff/Profile";
+
+// Auth/Protected
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -16,66 +41,80 @@ function App() {
 
   return (
     <Router>
-      <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-        {/* Header sticky */}
-        <Box
-          component="header"
-          sx={{
-            position: "sticky",
-            top: 0,
-            zIndex: 1200,
-            bgcolor: "white",
-            borderBottom: "1px solid #ddd",
-          }}
-        >
-          <Header />
-        </Box>
+      <Routes>
+        {/* ===================== USER ROUTES ===================== */}
+        <Route
+          path="/*"
+          element={
+            <UserLayout>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/products/:ma_san_pham" element={<ProductDetail />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/categories/:categoryId" element={<ProductListPage />} />
+                <Route path="/categories/:categoryId/:subCategoryId?" element={<ProductListPage />} />
+              </Routes>
+            </UserLayout>
+          }
+        />
 
-        {/* Layout chính: Sidebar + Content */}
-        <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-          {/* Sidebar cố định chiều cao, scroll riêng */}
-          <Box
-            sx={{
-              width: sidebarWidth,
-              transition: "width 0.3s",
-              borderRight: "1px solid #ddd",
-              overflowY: "auto",
-            }}
-          >
-            <Sidebar onSelectCategory={(cat) => console.log("Chọn:", cat)} />
-          </Box>
+        {/* ===================== ADMIN ROUTES ===================== */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminLayout>
+                <Routes>
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="tai-khoans" element={<QuanLyTaiKhoan />} />
+                  <Route path="chi-nhanhs" element={<QuanLyChiNhanh />} />
+                  <Route path="danh-mucs" element={<QuanLyDanhMuc />} />
+                  <Route path="san-phams" element={<QuanLySanPham />} />
+                  <Route path="ton-khos" element={<AdminQuanLyTonKho />} />
+                  <Route path="danh-gias" element={<QuanLyDanhGia/>}/>
+                  <Route path="khuyen-mais" element={<AdminQuanLyKhuyenMai/>}/>
+                  <Route path="nhap-hangs" element={<AdminYeuCauNhapHang/>} />
+                </Routes>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
 
-          {/* Nội dung chính */}
-          <Box
-            sx={{
-              flex: 1,
-              p: 2,
-              overflowY: "auto",
-              transition: "margin-left 0.3s",
-            }}
-          >
-            {/* Nút toggle Sidebar */}
-            <Box sx={{
-                display: "flex", 
-                alignItems: "center",}}>
-              <IconButton onClick={() => setSidebarOpen(!sidebarOpen)}>
-                <MenuIcon />
-              </IconButton>
-              {!sidebarOpen &&(
-                <Typography variant="subtitle1" fontWeight="bold" >
-                Danh mục sản phẩm
-              </Typography>
-              )}
-            </Box>
+        {/* BRANCH MANAGER */}
+        <Route
+          path="/manager/*"
+          element={
+            <ProtectedRoute role="manager">
+              <AdminLayout>
+                <Routes>
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="nhan-viens" element={<QuanLyNhanVien />} />
+                  <Route path="ton-khos" element={<QuanLyTonKho />} />
+                  <Route path="khuyen-mais" element={<QuanLyKhuyenMai />} />
+                  <Route path="don-hangs" element={<QuanLyDonHang />} />
+                  <Route path="nhap-hangs" element={<QuanLyYeuCauNhapHang />} />
+                </Routes>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
 
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-            </Routes>
-          </Box>
-        </Box>
-
-      </Box>
+        {/* STAFF */}
+        <Route
+          path="/staff/*"
+          element={
+            <ProtectedRoute role="staff">
+              <AdminLayout>
+                <Routes>
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="orders" element={<OrderManageStaff />} />
+                  <Route path="profile" element={<Profile />} />
+                </Routes>
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
     </Router>
   );
 }
