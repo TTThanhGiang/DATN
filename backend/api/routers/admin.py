@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from api.database import get_db, SessionLocal
 from api.models import ChiNhanh, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, TonKho, YeuCauNhapHang
-from api.routers.auth import lay_nguoi_dung_hien_tai, ma_hoa_mat_khau
+from api.routers.auth import lay_nguoi_dung_hien_tai, ma_hoa_mat_khau, phan_quyen
 from api.utils.response_helpers import success_response, error_response
 
 router = APIRouter(prefix="/admins", tags=["Quản trị viên"])
@@ -23,14 +23,14 @@ UPLOAD_DIR_DANHMUC = "uploads/danhmucs"
 # Mount thư mục mẹ ở app chính
 # app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-
+admin = "QUAN_TRI_VIEN"
 # ------------------ SẢN PHẨM ------------------
 @router.get("/danh-sach-san-pham")
 def danh_sach_san_pham(
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     total = db.query(SanPham).count()
     items = (
@@ -74,7 +74,7 @@ async def them_san_pham(
     mo_ta: str | None = Form(None),
     hinh_anh: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     sp = SanPham(
         ten_san_pham=ten_san_pham,
@@ -112,7 +112,7 @@ async def cap_nhat_san_pham(
     mo_ta: str | None = Form(None),
     hinh_anh: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     sp = db.query(SanPham).filter(SanPham.ma_san_pham == ma_san_pham).first()
     if not sp:
@@ -150,7 +150,7 @@ async def cap_nhat_san_pham(
 def xoa_san_pham(   
     ma_san_pham: int,
     db: Session = Depends(get_db),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     sp = db.query(SanPham).filter(SanPham.ma_san_pham == ma_san_pham).first()
     if not sp:
@@ -222,7 +222,7 @@ async def them_danh_muc(
     danh_muc_cha: int | None = Form(None),
     hinh_anh: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     dm = DanhMucSanPham(
         ten_danh_muc = ten_danh_muc,
@@ -282,9 +282,31 @@ async def cap_nhat_danh_muc(
 
     return success_response(data=jsonable_encoder(dm), message="Cập nhật danh mục thành công")
 
+@router.delete("/xoa-danh-muc/{ma_danh_muc}")
+def xoa_danh_muc(
+    ma_danh_muc: int,
+    db: Session = Depends(get_db),
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
+):
+    dm = db.query(DanhMucSanPham).filter(SanPham.ma_danh_muc == ma_danh_muc).first()
+    if not dm:
+        return error_response(message="Danh mục không tồn tại", success=False)
+
+    # Xóa ảnh liên quan
+    ha_list = db.query(HinhAnh).filter(HinhAnh.ma_danh_muc == dm.ma_danh_muc).all()
+    for ha in ha_list:
+        file_path = ha.duong_dan.replace("http://localhost:8000/", "")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        db.delete(ha)
+
+    db.delete(dm)
+    db.commit()
+    return success_response(data=jsonable_encoder(dm), message="Đã xóa sản phẩm và ảnh liên quan")
+    
 # ------------------ CHI NHÁNH ------------------
 @router.get("/danh-sach-chi-nhanh")
-def danh_sach_chi_nhanh(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+def danh_sach_chi_nhanh(currents_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
     chi_nhanhs = db.query(ChiNhanh).order_by(desc(ChiNhanh.ma_chi_nhanh)).all()
     result = []
     for cn in chi_nhanhs:
@@ -312,7 +334,7 @@ async def them_chi_nhanh(
     xa: str = Form(...),
     ma_buu_dien: str | None = Form(None),
     db: Session = Depends(get_db),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     chi_nhanh = ChiNhanh(
         ten_chi_nhanh = ten_chi_nhanh,
@@ -359,7 +381,7 @@ async def cap_nhat_chi_nhanh(
 
 # ------------------ NGƯỜI DÙNG ------------------
 @router.get("/danh-sach-nguoi-dung")
-def danh_sach_nguoi_dung(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+def danh_sach_nguoi_dung(currents_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
     nguoi_dungs = db.query(NguoiDung).order_by(desc(NguoiDung.ma_nguoi_dung)).all()
     result = []
     for nd in nguoi_dungs:
@@ -389,7 +411,7 @@ def danh_sach_nguoi_dung(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_
 @router.post("/them-nguoi-dung")
 async def them_nguoi_dung(
     nguoidung: NguoiDungCreate, 
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai),
+    currents_user: NguoiDung = Depends(phan_quyen(admin)),
     db: Session = Depends(get_db)
 ):
     if db.query(NguoiDung).filter((NguoiDung.so_dien_thoai == nguoidung.so_dien_thoai) | (NguoiDung.email == nguoidung.email)).first():
@@ -417,7 +439,7 @@ async def them_nguoi_dung(
     )
 
 @router.put("/khoa-tai-khoan/{ma_nguoi_dung}")
-def khoa_tai_khoan(ma_nguoi_dung: int, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+def khoa_tai_khoan(ma_nguoi_dung: int, currents_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
     nguoi_dung = db.query(NguoiDung).filter(NguoiDung.ma_nguoi_dung == ma_nguoi_dung).first()
     if not nguoi_dung:
         return error_response(message="Không tìm thấy người dùng")
@@ -431,7 +453,7 @@ def khoa_tai_khoan(ma_nguoi_dung: int, currents_user: NguoiDung = Depends(lay_ng
     )
 
 @router.put("/mo-khoa-tai-khoan/{ma_nguoi_dung}")
-def mo_khoa_tai_khoan(ma_nguoi_dung: int, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+def mo_khoa_tai_khoan(ma_nguoi_dung: int, currents_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
     nguoi_dung = db.query(NguoiDung).filter(NguoiDung.ma_nguoi_dung == ma_nguoi_dung).first()
     if not nguoi_dung:
         return error_response(message="Không tìm thấy người dùng")
@@ -451,7 +473,7 @@ def lay_danh_sach_ton_kho(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     ma_chi_nhanh: int = Query(None, description="Lọc theo chi nhánh"),
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)
+    currents_user: NguoiDung = Depends(phan_quyen(admin))
 ):
     
     query = db.query(TonKho).join(SanPham).join(ChiNhanh)
@@ -491,7 +513,7 @@ def lay_danh_sach_ton_kho(
     )
 
 @router.post("/them-ton-kho")
-def them_ton_kho(ton_kho_in: TonKhoCreate, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+def them_ton_kho(ton_kho_in: TonKhoCreate, currents_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
     san_pham = db.query(SanPham).filter(SanPham.ma_san_pham == ton_kho_in.ma_san_pham).first()
     chi_nhanh = db.query(ChiNhanh).filter(ChiNhanh.ma_chi_nhanh == ton_kho_in.ma_chi_nhanh).first()
 
@@ -526,8 +548,9 @@ def them_ton_kho(ton_kho_in: TonKhoCreate, currents_user: NguoiDung = Depends(la
         data=jsonable_encoder(ton_kho_moi),
         message="Thêm sản phẩm vào kho chi nhánh thành công"
     )
+
 @router.put("/cap-nhat-ton-kho/{ma_san_pham}/{ma_chi_nhanh}")
-def cap_nhat_ton_kho(ma_san_pham: int, ma_chi_nhanh: int, update: TonKhoUpdate, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+def cap_nhat_ton_kho(ma_san_pham: int, ma_chi_nhanh: int, update: TonKhoUpdate, currents_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
     ton_kho = db.query(TonKho).filter(
         TonKho.ma_san_pham == ma_san_pham,
         TonKho.ma_chi_nhanh == ma_chi_nhanh
@@ -553,7 +576,7 @@ def cap_nhat_ton_kho(ma_san_pham: int, ma_chi_nhanh: int, update: TonKhoUpdate, 
 @router.post("/them-nhieu-ton-kho")
 def them_nhieu_ton_kho(
     ton_kho_in: TonKhoManyCreate,
-    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai),
+    currents_user: NguoiDung = Depends(phan_quyen(admin)),
     db: Session = Depends(get_db)
 ):
     added_items = []
@@ -595,7 +618,6 @@ def them_nhieu_ton_kho(
         "errors": errors,
         "message": f"Thêm {len(added_items)} sản phẩm thành công, {len(errors)} lỗi"
     }
-
 
 @router.get("/danh-sach-yeu-cau-nhap-hang")
 def danh_sach_yeu_cau_nhap_hang(db: Session = Depends(get_db)):

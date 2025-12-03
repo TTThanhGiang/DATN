@@ -1,4 +1,5 @@
 from datetime import datetime
+from email.policy import default
 from zoneinfo import ZoneInfo
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Numeric, Enum, ForeignKey,
@@ -13,7 +14,8 @@ Base = declarative_base()
 # =========================
 gioi_tinh_enum = Enum("NAM", "NU", "KHAC", name="gioi_tinh", create_type=False)
 vai_tro_enum = Enum("KHACH_HANG", "NHAN_VIEN", "QUAN_LY", "QUAN_TRI_VIEN", name="vai_tro", create_type=False)
-trang_thai_don_hang_enum = Enum("CHO_XU_LY", "DA_THANH_TOAN", "DA_HUY", name="trang_thai_don_hang", create_type=False)
+trang_thai_don_hang_enum = Enum("CHO_XU_LY", "DA_XU_LY", "DA_HUY", "HOAN_THANH", name="trang_thai_don_hang", create_type=False)
+trang_thai_thanh_toan_enum = Enum("DA_THANH_TOAN", "CHUA_THANH_TOAN", name="trang_thai_don_hang", create_type=False)
 trang_thai_yeu_cau_enum = Enum("CHO_XU_LY", "DA_DUYET", "DA_HUY", name="trang_thai_yeu_cau", create_type=False)
 trang_thai_khuyen_mai = Enum("CHO_XU_LY", "DA_DUYET", "DA_HUY", name="trang_thai_khuyen_mai", create_type=False)
 
@@ -96,10 +98,12 @@ class HinhAnh(Base):
     ma_san_pham = Column(Integer, ForeignKey("san_pham.ma_san_pham"))
     ma_danh_muc = Column(Integer, ForeignKey("danh_muc_san_pham.ma_danh_muc"))
     ma_khuyen_mai = Column(Integer, ForeignKey("khuyen_mai.ma_khuyen_mai"))
+    ma_nguoi_dung =  Column(Integer, ForeignKey("nguoi_dung.ma_nguoi_dung"))
 
     san_pham = relationship("SanPham", back_populates="hinh_anhs")
     danh_muc = relationship("DanhMucSanPham", back_populates="hinh_anhs")
     khuyen_mai = relationship("KhuyenMai", back_populates="hinh_anhs")
+    nguoi_dung = relationship("NguoiDung", back_populates="hinh_anhs")
 
     # 2. Ràng buộc XOR (Độc quyền HOẶC)
     __table_args__ = (
@@ -180,6 +184,7 @@ class NguoiDung(Base):
     don_hangs = relationship("DonHang", back_populates="nguoi_dung", cascade="all, delete-orphan")
     danh_gias = relationship("DanhGia", back_populates="nguoi_dung", cascade="all, delete-orphan")
     lich_su_xems = relationship("LichSuXem", back_populates="nguoi_dung", cascade="all, delete-orphan")
+    hinh_anhs = relationship("HinhAnh", back_populates="nguoi_dung", cascade="all, delete-orphan")
 
 
 # =========================
@@ -223,6 +228,7 @@ class DonHang(Base):
     ma_chi_nhanh = Column(Integer, ForeignKey("chi_nhanh.ma_chi_nhanh"), nullable=False)
     ngay_dat = Column(DateTime,default=lambda: datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")))
     trang_thai = Column(trang_thai_don_hang_enum, default="CHO_XU_LY")
+    trang_thai_thanh_toan = Column(trang_thai_thanh_toan_enum, default="CHUA_THANH_TOAN")
     # ĐÃ CHUYỂN SANG INTEGER
     tong_tien = Column(Integer, nullable=False, comment="Đơn vị: Đồng") 
 

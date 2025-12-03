@@ -95,6 +95,16 @@ def lay_nguoi_dung_hien_tai(token: str = Depends(oauth2_scheme), db: Session = D
 def lay_nguoi_dung_theo_sdt(db: Session, sdt: str):
     return db.query(NguoiDung).filter(NguoiDung.so_dien_thoai == sdt).first()
 
+def phan_quyen(*allowed_roles):
+    def checker(current_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai)):
+        if current_user.vai_tro not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền truy cập"
+            )
+        return current_user
+    return checker
+
 async def gui_email_xac_thuc(email: schemas.EmailSchema, ho_ten: str):
     token = serializer.dumps(email, salt="email-confirm")
     link = f"http://localhost:8000/auth/xac-thuc-email/{token}"

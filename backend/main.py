@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from api import models, database
 from api.database import SessionLocal
-from api.routers import auth
-from api.routers import user
-from api.routers import admin
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api.routers import manager
+from api.routers import staff
+from api.routers import auth
+from api.routers import user
+from api.routers import admin
 
 # tạo bảng lần đầu
 models.Base.metadata.create_all(bind=database.engine)
@@ -38,6 +39,7 @@ app.include_router(auth.router)
 app.include_router(user.router)
 app.include_router(admin.router)
 app.include_router(manager.router)
+app.include_router(staff.router)
 
 
 @app.get("/")

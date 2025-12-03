@@ -183,6 +183,7 @@ def get_all_san_pham():
 @router.post("/them-gio-hang")
 def them_san_pham_vao_gio_hang(item: GioHangItemCreate,currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):    
     # 1️⃣ Kiểm tra sản phẩm có tồn tại không
+    
     san_pham = db.query(SanPham).filter(SanPham.ma_san_pham == item.ma_san_pham).first()
     if not san_pham:
         return error_response(
@@ -193,7 +194,7 @@ def them_san_pham_vao_gio_hang(item: GioHangItemCreate,currents_user: NguoiDung 
     # 2️⃣ Kiểm tra người dùng đã có giỏ hàng chưa
     gio_hang = db.query(GioHang).filter(GioHang.ma_nguoi_dung == currents_user.ma_nguoi_dung).first()
     if not gio_hang:
-        gio_hang = GioHang(ma_nguoi_dung=item.ma_nguoi_dung)
+        gio_hang = GioHang(ma_nguoi_dung=currents_user.ma_nguoi_dung)
         db.add(gio_hang)
         db.commit()
         db.refresh(gio_hang)

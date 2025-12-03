@@ -187,6 +187,7 @@ export default function ProductListPage() {
             }}
           >
             {filteredProducts.map((product) => (
+              console.log(product),
               <ProductCard
                 key={product.ma_san_pham}
                 product={product}

@@ -51,6 +51,24 @@ export default function YeuCauNhapHang(){
 
     const token = getToken();
 
+    const renderStatusChip = (status) => {
+        const mapBackendToFrontend = {
+          "CHO_XU_LY": "pending",
+          "DA_DUYET": "approved",
+          "DA_HUY": "rejected",
+        };
+    
+        const feStatus = mapBackendToFrontend[status];
+    
+        const map = {
+          pending: { label: "Chờ duyệt", color: "warning" },
+          approved: { label: "Đã duyệt", color: "success" },
+          rejected: { label: "Từ chối", color: "error" },
+        };
+    
+        return <Chip label={map[feStatus].label} color={map[feStatus].color} size="small" />;
+    };
+
 
     const handleTabChange = (_,value) =>{
         setActiveTab(value);
@@ -244,13 +262,7 @@ export default function YeuCauNhapHang(){
                             <TableCell>{item.ma_yeu_cau}</TableCell>
                             <TableCell>{item.ly_do}</TableCell>
                             <TableCell>{item.ngay_tao}</TableCell>
-                            <TableCell>
-                            <Chip
-                                label={item.trang_thai}
-                                color={item.trang_thai === "CHO_XU_LY" ? "warning" : "success"}
-                                size="small"
-                            />
-                            </TableCell>
+                            <TableCell>{renderStatusChip(item.trang_thai)}</TableCell>
                             <TableCell>
                                 <Button size="small" variant="contained" onClick={() => handleView(item)}>
                                     Xem

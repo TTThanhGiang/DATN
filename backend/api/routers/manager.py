@@ -3,15 +3,16 @@ import json
 from typing  import List
 from typing import Optional
 import os
+from unittest import result
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.encoders import jsonable_encoder
 from fastapi.staticfiles import StaticFiles
-from api.schemas import KhuyenMaiCreate, NguoiDungCreate, NhanVienCreate, SanPhamKMItem, SanPhamYeuCauOut, TonKhoCreate, TonKhoUpdate, YeuCauNhapHangCreate, YeuCauNhapHangOut, YeuCauNhapHangUpdate
+from api.schemas import DonHangOut, HinhAnhItem, HuyDonInput, KhuyenMaiCreate, KhuyenMaiOut, NguoiDungCreate, NhanVienCreate, SanPhamDonHangOut, SanPhamKMItem, SanPhamKMItemOut, SanPhamYeuCauOut, TonKhoCreate, TonKhoUpdate, YeuCauNhapHangCreate, YeuCauNhapHangOut, YeuCauNhapHangUpdate
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from api.database import get_db, SessionLocal
-from api.models import ChiNhanh, KhuyenMai, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, SanPhamKhuyenMai, SanPhamYeuCau, TonKho, YeuCauNhapHang
+from api.models import ChiNhanh, DonHang, KhuyenMai, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, SanPhamKhuyenMai, SanPhamYeuCau, TonKho, YeuCauNhapHang
 from api.routers.auth import lay_nguoi_dung_hien_tai, ma_hoa_mat_khau
 from api.utils.response_helpers import success_response, error_response
 
@@ -118,7 +119,7 @@ def lay_danh_sach_ton_kho(
 ):
     ma_chi_nhanh = currents_user.ma_chi_nhanh
     query = db.query(TonKho).join(SanPham).join(ChiNhanh)
-    ton_khos = query.filter(TonKho.ma_chi_nhanh == ma_chi_nhanh).all()
+    ton_khos = query.filter(TonKho.ma_chi_nhanh == ma_chi_nhanh).offset(offset).limit(limit).all()
 
     total = db.query(TonKho).count()
 
@@ -421,3 +422,248 @@ async def tao_khuyen_mai(
         message="Tại khuyến mãi thành công"
     )
 
+@router.get("/danh-sach-khuyen-mai", response_model=List[KhuyenMaiOut])
+def danh_sach_khuyen_mai( db: Session = Depends(get_db)):
+    khuyen_mais = db.query(KhuyenMai).order_by(desc(KhuyenMai.ma_khuyen_mai)).all()
+    result = []
+    for km in khuyen_mais:
+        san_phams = [
+            SanPhamKMItemOut(ma_san_pham=sp.ma_san_pham, so_luong=sp.so_luong, ten_san_pham=sp.san_pham.ten_san_pham)
+            for sp in km.san_pham_khuyen_mais
+        ]
+        hinh_anhs = [
+            HinhAnhItem(duong_dan=ha.duong_dan, mo_ta=ha.mo_ta)
+            for ha in km.hinh_anhs
+        ]
+        result.append(KhuyenMaiOut(
+            ma_khuyen_mai=km.ma_khuyen_mai,
+            ten_khuyen_mai=km.ten_khuyen_mai,
+            ma_code=km.ma_code,
+            mo_ta=km.mo_ta,
+            giam_gia=float(km.giam_gia),
+            ngay_bat_dau=km.ngay_bat_dau,
+            ngay_ket_thuc=km.ngay_ket_thuc,
+            ma_chi_nhanh=km.ma_chi_nhanh,
+            trang_thai=km.trang_thai,
+            san_phams=san_phams,
+            hinh_anhs=hinh_anhs
+        ))
+    return success_response(
+        data=jsonable_encoder(result),
+        message="Lấy danh sách thành công"
+    )
+
+@router.put("/cap-nhat-khuyen-mai/{ma_khuyen_mai}")
+async def cap_nhat_khuyen_mai(
+    ma_khuyen_mai: int,
+    ten_khuyen_mai: Optional[str] = Form(None),
+    ma_code: Optional[str] = Form(None),
+    mo_ta: Optional[str] = Form(None),
+    giam_gia: Optional[float] = Form(None),
+    ngay_bat_dau: Optional[datetime] = Form(None),
+    ngay_ket_thuc: Optional[datetime] = Form(None),
+    san_phams: Optional[str] = Form(None),  # JSON string
+    hinh_anh: Optional[UploadFile] = File(None),
+    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai),
+    db: Session = Depends(get_db)
+):
+    km = db.query(KhuyenMai).filter(
+        KhuyenMai.ma_khuyen_mai == ma_khuyen_mai
+    ).first()
+
+    if not km:
+        return error_response(message="Không tìm thấy khuyến mãi")
+
+    # Kiểm tra mã code trùng (nếu gửi lên)
+    if ma_code and ma_code != km.ma_code:
+        exists = db.query(KhuyenMai).filter(KhuyenMai.ma_code == ma_code).first()
+        if exists:
+            return error_response(message="Mã khuyến mãi đã tồn tại")
+
+    # Kiểm tra ngày
+    if ngay_bat_dau and ngay_ket_thuc:
+        if ngay_ket_thuc < ngay_bat_dau:
+            return error_response(message="Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu")
+
+    # --- Cập nhật field đơn ---
+    if ten_khuyen_mai is not None:
+        km.ten_khuyen_mai = ten_khuyen_mai
+    if ma_code is not None:
+        km.ma_code = ma_code
+    if mo_ta is not None:
+        km.mo_ta = mo_ta
+    if giam_gia is not None:
+        km.giam_gia = giam_gia
+    if ngay_bat_dau is not None:
+        km.ngay_bat_dau = ngay_bat_dau
+    if ngay_ket_thuc is not None:
+        km.ngay_ket_thuc = ngay_ket_thuc
+
+    # --- Update hình ảnh mới ---
+    if hinh_anh is not None and hinh_anh.filename:
+        os.makedirs(UPLOAD_DIR_KHUYENMAI, exist_ok=True)
+        file_path = os.path.join(UPLOAD_DIR_KHUYENMAI, hinh_anh.filename)
+
+        with open(file_path, "wb") as f:
+            f.write(await hinh_anh.read())
+
+        file_url = f"http://localhost:8000/{file_path}"
+
+        # Xóa ảnh cũ
+        db.query(HinhAnh).filter(HinhAnh.ma_khuyen_mai == ma_khuyen_mai).delete()
+
+        # Thêm ảnh mới
+        ha = HinhAnh(
+            ma_khuyen_mai=ma_khuyen_mai,
+            duong_dan=file_url,
+            mo_ta=km.ten_khuyen_mai
+        )
+        db.add(ha)
+
+    # --- Update danh sách sản phẩm ---
+    if san_phams is not None:
+        # Xóa danh sách cũ
+        db.query(SanPhamKhuyenMai).filter(
+            SanPhamKhuyenMai.ma_khuyen_mai == ma_khuyen_mai
+        ).delete()
+
+        # Parse JSON string
+        try:
+            san_pham_list = [SanPhamKMItem(**item) for item in json.loads(san_phams)]
+        except:
+            return error_response(message="Danh sách sản phẩm không hợp lệ")
+
+        # Thêm lại danh sách mới
+        for sp in san_pham_list:
+            db.add(
+                SanPhamKhuyenMai(
+                    ma_khuyen_mai=ma_khuyen_mai,
+                    ma_san_pham=sp.ma_san_pham,
+                    so_luong=sp.so_luong
+                )
+            )
+
+    db.commit()
+    db.refresh(km)
+
+    return success_response(
+        data=jsonable_encoder(km),
+        message="Cập nhật khuyến mãi thành công"
+    )
+
+#---------------- ĐƠN HÀNG -----------------
+@router.get("/danh-sach-don-hang")
+def danh_sach_don_hang(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+    ma_chi_nhanh = currents_user.ma_chi_nhanh
+
+    don_hangs = (
+        db.query(DonHang)
+        .filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
+        .order_by(DonHang.ngay_dat.desc())
+        .all()
+    )
+    result = []
+
+    for dh in don_hangs:
+        ds_san_pham = []
+        for ct in dh.chi_tiet_don_hangs:
+            hinh_anh = None
+            if hasattr(ct.san_pham, "hinh_anhs") and ct.san_pham.hinh_anhs:
+                hinh_anh = ct.san_pham.hinh_anhs[0].duong_dan
+            ds_san_pham.append(
+                SanPhamDonHangOut(
+                    ma_san_pham=ct.ma_san_pham,
+                    ten_san_pham=ct.san_pham.ten_san_pham,
+                    so_luong=ct.so_luong,
+                    gia_tien=ct.gia_tien,
+                    don_vi=ct.san_pham.don_vi,
+                    hinh_anhs=hinh_anh
+                )
+            )
+        result.append(
+            DonHangOut(
+                ma_don_hang=dh.ma_don_hang,
+                ho_ten=dh.ho_ten,
+                dia_chi=dh.dia_chi,
+                so_dien_thoai=dh.so_dien_thoai,
+                trang_thai=dh.trang_thai,
+                trang_thai_thanh_toan=dh.trang_thai_thanh_toan,
+                tong_tien=dh.tong_tien,
+                ngay_dat=dh.ngay_dat,
+                chi_tiet=ds_san_pham,
+            )
+        )
+    return success_response(
+        data=jsonable_encoder(result),
+        message="Lấy danh sách đơn hàng thành công"
+    )
+
+@router.put("/don-hang/{ma_don_hang}/duyet")
+def duyet_don_hang(
+    ma_don_hang: int,
+    db: Session = Depends(get_db)
+):
+    don = db.query(DonHang).filter(DonHang.ma_don_hang == ma_don_hang).first()
+
+    if not don:
+        return error_response(message="Không tìm thấy đơn hàng")
+
+    if don.trang_thai != "CHO_XU_LY":
+        return error_response(message="Chỉ đơn hàng CHO_XU_LY mới được duyệt")
+
+    don.trang_thai = "DA_XU_LY"
+    db.commit()
+    db.refresh(don)
+
+    return success_response(
+        data=jsonable_encoder(don),
+        message="Duyệt đơn hàng thành công"
+    )
+
+@router.put("/don-hang/{ma_don_hang}/hoan-thanh")
+def hoan_thanh_don_hang(
+    ma_don_hang: int,
+    db: Session = Depends(get_db)
+):
+    don = db.query(DonHang).filter(DonHang.ma_don_hang == ma_don_hang).first()
+
+    if not don:
+        return error_response(message="Không tìm thấy đơn hàng")
+
+    if don.trang_thai != "DA_XU_LY":
+        return error_response(message="Chỉ đơn hàng DA_XU_LY mới được hoàn thành")
+
+    don.trang_thai = "HOAN_THANH"
+    don.trang_thai_thanh_toan = "DA_THANH_TOAN"
+    db.commit()
+    db.refresh(don)
+
+    return success_response(
+        data=jsonable_encoder(don),
+        message="Hoàn thành đơn hàng thành công"
+    )
+
+@router.put("/don-hang/{ma_don_hang}/huy")
+def huy_don_hang(
+    ma_don_hang: int,
+    payload: HuyDonInput,
+    db: Session = Depends(get_db)
+):
+    don = db.query(DonHang).filter(DonHang.ma_don_hang == ma_don_hang).first()
+
+    if not don:
+        return error_response(message="Không tìm thấy đơn hàng")
+
+    if don.trang_thai in ["HOAN_THANH", "DA_HUY"]:
+        return error_response(message="Đơn đã kết thúc, không thể hủy")
+
+    don.trang_thai = "DA_HUY"
+    # Nếu bạn có bảng lưu lịch sử, có thể ghi lý do tại đây
+
+    db.commit()
+    db.refresh(don)
+
+    return success_response(
+        data=jsonable_encoder(don),
+        message=f"Đơn hàng đã bị hủy. Lý do: {payload.ly_do}"
+    )

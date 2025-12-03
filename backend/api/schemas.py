@@ -63,6 +63,7 @@ class DanhMucCreate(BaseModel):
     hinh_anhs: List[HinhAnhSchema] = []
 
 class SanPhamSchema(BaseModel):
+    ma_san_pham: int
     ten_san_pham: str
     mo_ta: Optional[str] = None
     don_gia: int
@@ -180,5 +181,52 @@ class KhuyenMaiCreate(BaseModel):
     ma_chi_nhanh: int | None = None
     san_phams: list[SanPhamKMItem] | None = None   # ❗ Có thể None
 
+class SanPhamKMItemOut(SanPhamKMItem):
+    ten_san_pham: str
 
+class HinhAnhItem(BaseModel):
+    duong_dan: str
+    mo_ta: Optional[str] = None
+
+class KhuyenMaiOut(BaseModel):
+    ma_khuyen_mai: int
+    ten_khuyen_mai: str
+    ma_code: str
+    mo_ta: Optional[str]
+    giam_gia: float
+    ngay_bat_dau: datetime
+    ngay_ket_thuc: datetime
+    ma_chi_nhanh: Optional[int]
+    trang_thai: str
+    san_phams: List[SanPhamKMItemOut] = []
+    hinh_anhs: List[HinhAnhItem] = []
+
+class SanPhamDonHangOut(BaseModel):
+    ma_san_pham: int
+    ten_san_pham: str
+    so_luong: int
+    gia_tien: int
+    don_vi: str
+    hinh_anhs:  str | None = None
+
+    class Config:
+        orm_mode = True
+
+
+class DonHangOut(BaseModel):
+    ma_don_hang: int
+    ho_ten: str
+    dia_chi: str
+    so_dien_thoai: str
+    trang_thai: str
+    trang_thai_thanh_toan: str
+    tong_tien: int
+    ngay_dat: datetime
+    chi_tiet: list[SanPhamDonHangOut]
+
+    class Config:
+        orm_mode = True
+
+class HuyDonInput(BaseModel):
+    ly_do: str
 

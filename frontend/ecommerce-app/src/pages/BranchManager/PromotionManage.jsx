@@ -40,6 +40,8 @@ const samplePromotions = [
 
 export default function PromotionManage() {
   const [activeTab, setActiveTab] = useState(0);
+  const [promotionList, setPromotionList] = useState([]);
+
   const [editPromo, setEditPromo] = useState(null);
 
   const [productList, setProductList] = useState([]);
@@ -53,7 +55,26 @@ export default function PromotionManage() {
 
   const token = getToken();
 
-  const handleTabChange = (_, value) => setActiveTab(value);
+  const handleTabChange = (_, value) => {
+    setActiveTab(value);
+    setEditPromo(null);
+
+    if (value === 0) {
+      // reset form khi tạo mới
+      setFormData({
+        ten_khuyen_mai: "",
+        ma_khuyen_mai: "",
+        mo_ta: "",
+        giam_gia: "",
+        ngay_bat_dau: "",
+        ngay_ket_thuc: "",
+      });
+      setSelectedProducts([]);
+      setProductQuantities({});
+      setImageFile(null);
+      setImagePreview("");
+    }
+  };
 
   const [formData, setFormData] = useState({
     ten_khuyen_mai: '',
@@ -74,6 +95,32 @@ export default function PromotionManage() {
 
   const handleEdit = (promo) => {
     setEditPromo(promo);
+    setFormData({
+      ten_khuyen_mai: promo.ten_khuyen_mai,
+      ma_khuyen_mai: promo.ma_code,
+      mo_ta: promo.mo_ta || "",
+      giam_gia: promo.giam_gia,
+      ngay_bat_dau: promo.ngay_bat_dau.slice(0, 16), 
+      ngay_ket_thuc: promo.ngay_ket_thuc.slice(0, 16),
+    });
+
+    // Set ảnh nếu có
+    if (promo.hinh_anhs?.length > 0) {
+      setImagePreview(promo.hinh_anhs[0].duong_dan);
+    }
+
+    // Set sản phẩm
+    const selected = promo.san_phams?.map(sp => sp);
+    setSelectedProducts(selected);
+
+    console.log(selected);
+
+    const quantities = {};
+    promo.san_phams?.forEach(sp => {
+      quantities[sp.ma_san_pham] = sp.so_luong;
+    });
+    setProductQuantities(quantities);
+
     setActiveTab(1);
   };
 
@@ -87,6 +134,7 @@ export default function PromotionManage() {
 
   useEffect(() => {
     fetchProductList();
+    fetchPromotionList();
   },[]);
 
   const fetchProductList = async () => {
@@ -97,6 +145,22 @@ export default function PromotionManage() {
       console.error("Lấy danh sách sản phẩm thất bại", err);
     }
   };
+
+  const fetchPromotionList = async () => {
+    try{
+      const res = await api.get(`/manager/danh-sach-khuyen-mai`,{
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+        }
+      })
+      if(res.data.success){
+        setPromotionList(res.data.data);
+      }
+    }catch(err){
+      console.log("Có lỗi khi lấy danh sách khuyến mãi", err);
+    }
+
+  }
 
   const filteredProduct = productList.filter(p =>
     p.ten_san_pham.toLowerCase().includes(search.toLowerCase())
@@ -120,54 +184,68 @@ export default function PromotionManage() {
   };
 
   const renderStatusChip = (status) => {
+    const mapBackendToFrontend = {
+      "CHO_XU_LY": "pending",
+      "DA_DUYET": "approved",
+      "DA_HUY": "rejected",
+    };
+
+    const feStatus = mapBackendToFrontend[status];
+
     const map = {
       pending: { label: "Chờ duyệt", color: "warning" },
       approved: { label: "Đã duyệt", color: "success" },
       rejected: { label: "Từ chối", color: "error" },
     };
-    return <Chip label={map[status].label} color={map[status].color} size="small" />;
+
+    return <Chip label={map[feStatus].label} color={map[feStatus].color} size="small" />;
   };
 
   const handleSavePromotion = async () => {
     try {
       const fd = new FormData();
 
-    // Chèn text / number / datetime
-    fd.append("ten_khuyen_mai", formData.ten_khuyen_mai);
-    fd.append("ma_code", formData.ma_khuyen_mai);
-    fd.append("mo_ta", formData.mo_ta || "");
-    fd.append("giam_gia", formData.giam_gia);
-    fd.append("ngay_bat_dau", new Date(formData.ngay_bat_dau).toISOString());
-    fd.append("ngay_ket_thuc", new Date(formData.ngay_ket_thuc).toISOString());
-    fd.append(
-      "san_phams",
-      JSON.stringify(
-        selectedProducts.map(p => ({
-          ma_san_pham: p.ma_san_pham,
-          so_luong: productQuantities[p.ma_san_pham] || 1,
-        }))
-      )
-    );
+      fd.append("ten_khuyen_mai", formData.ten_khuyen_mai);
+      fd.append("ma_code", formData.ma_khuyen_mai);
+      fd.append("mo_ta", formData.mo_ta || "");
+      fd.append("giam_gia", formData.giam_gia);
+      fd.append("ngay_bat_dau", new Date(formData.ngay_bat_dau).toISOString());
+      fd.append("ngay_ket_thuc", new Date(formData.ngay_ket_thuc).toISOString());
+      fd.append(
+        "san_phams",
+        JSON.stringify(
+          selectedProducts.map(p => ({
+            ma_san_pham: p.ma_san_pham,
+            so_luong: productQuantities[p.ma_san_pham] || 1,
+          }))
+        )
+      );
 
-    // Chèn file ảnh nếu có
-    if (imageFile) {
-      fd.append("hinh_anh", imageFile);
-    }
-
-      console.log("FormData gửi lên API:");
-      for (let [key, value] of fd.entries()) {
-        console.log(key, value);
+      if (imageFile) {
+        fd.append("hinh_anh", imageFile);
+      }
+      let res;
+      if (editPromo) {
+        // UPDATE
+        res = await api.put(`/manager/cap-nhat-khuyen-mai/${editPromo.ma_khuyen_mai}`, fd, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        alert("Cập nhật khuyến mãi thành công!");
+      } else {
+        // CREATE
+        res = await api.post("/manager/tao-khuyen-mai", fd, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`, 
+          },
+        });
+        alert("Thêm khuyến mãi thành công!");
       }
 
-      const res = await api.post("/manager/tao-khuyen-mai", fd, {
-        headers: { 
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`, 
-        }
-      });
-
-      console.log("Response:", res.data);
-      alert("Thêm khuyến mãi thành công!");
+      fetchPromotionList(); // load lại danh sách
 
       // Reset form
       setFormData({
@@ -178,13 +256,17 @@ export default function PromotionManage() {
         ngay_bat_dau: "",
         ngay_ket_thuc: "",
       });
+
       setSelectedProducts([]);
       setProductQuantities({});
+      setImageFile(null);
+      setImagePreview("");
+      setEditPromo(null);
       setActiveTab(0);
 
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || err.message || "Thêm khuyến mãi thất bại");
+      alert(err.response?.data?.message || err.message || "Lưu khuyến mãi thất bại");
     }
   };
   return (
@@ -202,7 +284,6 @@ export default function PromotionManage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>Tên khuyến mãi</TableCell>
                 <TableCell>Mã</TableCell>
                 <TableCell>Giảm (%)</TableCell>
@@ -213,15 +294,14 @@ export default function PromotionManage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {samplePromotions.map((promo) => (
-                <TableRow key={promo.id} hover>
-                  <TableCell>{promo.id}</TableCell>
-                  <TableCell>{promo.name}</TableCell>
-                  <TableCell>{promo.code}</TableCell>
-                  <TableCell>{promo.discount}%</TableCell>
-                  <TableCell>{promo.start}</TableCell>
-                  <TableCell>{promo.end}</TableCell>
-                  <TableCell>{renderStatusChip(promo.status)}</TableCell>
+              {promotionList.map((promo) => (
+                <TableRow key={promo.ma_khuyen_mai} hover>
+                  <TableCell>{promo.ten_khuyen_mai}</TableCell>
+                  <TableCell>{promo.ma_code}</TableCell>
+                  <TableCell>{promo.giam_gia}%</TableCell>
+                  <TableCell>{promo.ngay_bat_dau}</TableCell>
+                  <TableCell>{promo.ngay_ket_thuc}</TableCell>
+                  <TableCell>{renderStatusChip(promo.trang_thai)}</TableCell>
                   <TableCell align="right">
                     <IconButton onClick={() => handleEdit(promo)}>
                       <EditOutlined />

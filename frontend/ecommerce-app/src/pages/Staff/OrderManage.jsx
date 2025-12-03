@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Tabs,
@@ -18,46 +18,195 @@ import {
   Stepper,
   Step,
   StepLabel,
+  Chip
 } from "@mui/material";
 import PageWrapper from "../../components/PageWrapper";
 import CartItem from "../../components/User/Cart/CartItem";
 import { useNavigate } from "react-router-dom";
+import api from "../../api";
+import { getToken } from "../../utils/auth";
+import SanPhamDonHang from "../../components/User/Cart/SanPhamDonHang";
 
 export default function OrderManage() {
   const navigate = useNavigate();
+  const [orderList, setOrderList] = useState([]);
+
   const [activeTab, setActiveTab] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const orders = [
-    {
-      id: 1,
-      customer: "Nguyễn Văn A",
-      phone: "0901234567",
-      address: "123 Nguyễn Trãi, Hà Nội",
-      payment: "COD",
-      total: 25000,
-      status: 2,
-      items: [
-        {
-          id: 101,
-          name: "Bắp cải thảo bắp từ 500g trở lên",
-          price: 25000,
-          weight: "500g",
-          image: "/images/thumb-bananas.png",
-        },
-      ],
-    },
-  ];
+  const token = getToken();
+
+  const mapTrangThaiThanhToan = (status) =>{
+      let trang_thai
+      if (status === 'CHUA_THANH_TOAN')
+        return trang_thai = "Chưa thanh toán"
+      return trang_thai = "Đã thanh toán"
+  }
 
   const handleView = (order) => {
     setSelectedOrder(order);
     setActiveTab(1);
   };
 
+  useEffect(() => {
+    fetchOrderList();
+  },[]);
+
+  const fetchOrderList = async () => {
+    try{
+      const res = await api.get(`/staff/danh-sach-don-hang`,{
+        headers: { Authorization: `Bearer ${token}`}
+      })
+      if(res.data.success){
+        setOrderList(res.data.data);
+      }
+    }catch(err){
+      console.log("Lỗi khi lấy danh sách đơn hàng", err);
+    }
+  }
+
+  const renderStatusChip = (status) => {
+    const mapBackendToFrontend = {
+      "CHO_XU_LY": "pending",
+      "DA_XU_LY": "approved",
+      "DA_HUY": "rejected",
+      "HOAN_THANH": "completed", // thêm trạng thái hoàn thành
+    };
+
+    const feStatus = mapBackendToFrontend[status] || "pending"; // default fallback
+
+    // Map frontend key sang label & color
+    const map = {
+      pending: { label: "Chờ xử lý", color: "warning" },
+      approved: { label: "Đã duyệt", color: "success" },
+      rejected: { label: "Đã hủy", color: "error" },
+      completed: { label: "Hoàn thành", color: "primary" }, // thêm màu cho hoàn thành
+    };
+
+    return <Chip label={map[feStatus].label} color={map[feStatus].color} size="small" />;
+  };
+  
+
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
-  const steps = ["Đặt hàng", "Xác nhận", "Đang giao", "Hoàn thành"];
+  const handleDuyet = async () => {
+    const ma_don_hang = selectedOrder.ma_don_hang;
+    const res = await api.put(`/staff/don-hang/${ma_don_hang}/duyet`,{}, {
+      headers: {Authorization: `Bearer ${token}`}
+    })
+    if(res.data.success){
+      alert(res.data.message);
+      setActiveTab(0);
+      setSelectedOrder(null);
+      fetchOrderList();
+    } else(
+      alert(res.data.message)
+    )
+  };
+
+  const handleHoanThanh = async () => {
+    const ma_don_hang = selectedOrder.ma_don_hang;
+    const res = await api.put(`/staff/don-hang/${ma_don_hang}/hoan-thanh`, {},{
+      headers: {Authorization: `Bearer ${token}`}
+    })
+    if(res.data.success){
+      alert(res.data.message);
+      setActiveTab(0);
+      setSelectedOrder(null);
+      fetchOrderList();
+    } else(
+      alert(res.data.message)
+    )
+  };
+
+  const handleHuy = async () => {
+    const ma_don_hang = selectedOrder.ma_don_hang;
+    const res = await api.put(`/staff/don-hang/${ma_don_hang}/huy`, {"ly_do": cancelReason},{
+      headers: {Authorization: `Bearer ${token}`}
+    })
+    if(res.data.success){
+      alert(res.data.message);
+      setActiveTab(0);
+      setSelectedOrder(null);
+      fetchOrderList();
+    } else(
+      alert(res.data.message)
+    )
+  };
+  const renderActionButtons = (status) => {
+    switch (status) {
+      case "CHO_XU_LY":
+        return (
+          <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => handleDuyet()}
+            >
+              Duyệt đơn
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setCancelOpen(true)}
+            >
+              Hủy đơn
+            </Button>
+          </Stack>
+        );
+
+      case "DA_XU_LY":
+        return (
+          <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleHoanThanh()}
+            >
+              Hoàn thành
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setCancelOpen(true)}
+            >
+              Hủy đơn
+            </Button>
+          </Stack>
+        );
+
+      case "HOAN_THANH":
+         return (
+          <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+            <Button
+              variant="contained"
+              color="primary"
+              disabled
+            >
+              Hoàn thành
+            </Button>
+          </Stack>
+        );
+      case "DA_HUY":
+        return (
+          <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+            <Button
+              variant="outlined"
+              color="error"
+              disabled
+            >
+              Đã hủy
+            </Button>
+          </Stack>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <PageWrapper title="Quản lý đơn hàng">
@@ -82,13 +231,13 @@ export default function OrderManage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {orders.map((o) => (
-                <TableRow key={o.id} hover>
-                  <TableCell>{o.id}</TableCell>
-                  <TableCell>{o.customer}</TableCell>
-                  <TableCell>{o.phone}</TableCell>
-                  <TableCell>{o.total.toLocaleString()}đ</TableCell>
-                  <TableCell>{steps[o.status]}</TableCell>
+              {orderList.map((o) => (
+                <TableRow key={o.ma_don_hang} hover>
+                  <TableCell>{o.ma_don_hang}</TableCell>
+                  <TableCell>{o.ho_ten}</TableCell>
+                  <TableCell>{o.so_dien_thoai}</TableCell>
+                  <TableCell>{o.tong_tien.toLocaleString()}đ</TableCell>
+                  <TableCell>{renderStatusChip(o.trang_thai)}</TableCell>
                   <TableCell align="right">
                     <Button size="small" variant="contained" onClick={() => handleView(o)}>
                       Xem
@@ -105,28 +254,15 @@ export default function OrderManage() {
         <>
           <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
             <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={2}>
-              🚚 Trạng thái đơn hàng
-            </Typography>
-            <Stepper activeStep={selectedOrder.status} alternativeLabel>
-              {steps.map((l) => (
-                <Step key={l}>
-                  <StepLabel>{l}</StepLabel>
-                </Step>
-              ))}
-            </Stepper>
-      </Paper>
-
-          <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={2}>
               👤 Thông tin khách hàng
             </Typography>
             <Stack spacing={2} direction={{ xs: "column", md: "row" }}>
-              <TextField label="Tên khách hàng" value={selectedOrder.customer} fullWidth InputProps={{ readOnly: true }} />
-              <TextField label="Số điện thoại" value={selectedOrder.phone} fullWidth InputProps={{ readOnly: true }} />
+              <TextField label="Tên khách hàng" value={selectedOrder.ho_ten} fullWidth InputProps={{ readOnly: true }} />
+              <TextField label="Số điện thoại" value={selectedOrder.so_dien_thoai} fullWidth InputProps={{ readOnly: true }} />
             </Stack>
             <Stack spacing={2} direction={{ xs: "column", md: "row" }} sx={{ mt: 2 }}>
-              <TextField label="Địa chỉ" value={selectedOrder.address} fullWidth InputProps={{ readOnly: true }} />
-              <TextField label="Thanh toán" value={selectedOrder.payment} fullWidth InputProps={{ readOnly: true }} />
+              <TextField label="Địa chỉ" value={selectedOrder.dia_chi} fullWidth InputProps={{ readOnly: true }} />
+              <TextField label="Thanh toán" value={mapTrangThaiThanhToan(selectedOrder.trang_thai_thanh_toan)} fullWidth InputProps={{ readOnly: true }} />
             </Stack>
           </Paper>
 
@@ -134,38 +270,25 @@ export default function OrderManage() {
             <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={2}>
               🛍️ Sản phẩm đã đặt
             </Typography>
-            {selectedOrder.items.map((i) => (
+            {selectedOrder.chi_tiet.map((i) => (
               <Box
-                key={i.id}
+                key={i.ma_san_pham}
                 sx={{ border: "1px solid #eee", borderRadius: 2, p: 2, mb: 2, cursor: "pointer", "&:hover": { background: "#f9f9f9" } }}
-                onClick={() => navigate(`/product/${i.id}`)}
+                onClick={() => navigate(`/product/${i.ma_san_pham}`)}
               >
-                <CartItem name={i.name} pricePerKg={i.price} weight={i.weight} image={i.image} />
+                <SanPhamDonHang name={i.ten_san_pham} pricePerKg={i.gia_tien} weight={i.don_vi}  image={i.hinh_anhs} quantity={i.so_luong} />
               </Box>
             ))}
             <Divider sx={{ my: 2 }} />
             <Stack direction="row" justifyContent="space-between">
               <Typography fontWeight="bold">Tổng tiền:</Typography>
               <Typography fontWeight="bold" color="primary.main">
-                {selectedOrder.total.toLocaleString()}đ
+                {selectedOrder.tong_tien.toLocaleString()}đ
               </Typography>
             </Stack>
           </Paper>
           <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
-            <Button
-                variant="contained"
-                color="success"
-                onClick={() => {
-                const updated = { ...selectedOrder, status: selectedOrder.status + 1 };
-                setSelectedOrder(updated);
-                alert("✅ Đã duyệt đơn!");
-                }}
-            >Duyệt đơn</Button>
-            <Button
-                variant="outlined"
-                color="error"
-                onClick={() => setCancelOpen(true)}
-            >Hủy đơn</Button>
+            {renderActionButtons(selectedOrder?.trang_thai)}
         </Stack>
         </>
       )}
@@ -201,10 +324,8 @@ export default function OrderManage() {
                 color="error"
                 variant="contained"
                 onClick={() => {
-                  alert("❌ Đơn đã bị hủy: " + cancelReason);
+                  handleHuy();
                   setCancelOpen(false);
-                  setSelectedOrder(null);
-                  setActiveTab(0);
                 }}
               >Xác nhận</Button>
             </Stack>

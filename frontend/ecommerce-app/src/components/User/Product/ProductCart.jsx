@@ -43,9 +43,10 @@ const ProductCard = ({ product, onAddToCart }) => {
       }
     );
     }catch(error){
-      console.log("Lỗi khi xem chi tiết sản phẩm", error)
+      console.log("Lỗi khi xem chi tiết sản phẩm", ma_san_pham)
     }
     navigate(`/products/${ma_san_pham}`);
+
   }
 
   return (
