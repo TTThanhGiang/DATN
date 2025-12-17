@@ -26,9 +26,7 @@ function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState("Mô tả");
-  const [rating, setRating] = useState(0);
-
-  const {ma_san_pham} = useParams();
+  const [ratings, setRatings] = useState(0);
 
   const handleIncrease = () => setQuantity((prev) => prev + 1);
   const handleDecrease = () =>
@@ -42,9 +40,12 @@ function ProductDetail() {
   ];
 
   useEffect(() => {
-    const fetchProductDetails = async () => {
+    fetchProductDetails();
+  },[id]);
+
+  const fetchProductDetails = async () => {
       try {
-        const response = await api.get(`/users/chi-tiet-san-pham/${ma_san_pham}`);
+        const response = await api.get(`/users/chi-tiet-san-pham/${id}`);
         if (response.status === 200) {
           setProduct(response.data.data);
         }
@@ -52,9 +53,44 @@ function ProductDetail() {
         console.error("Lỗi lấy chi tiết sản phẩm:", error);
       }
     }
-    fetchProductDetails();
-  },[ma_san_pham]);
 
+  const fetchProductRatings = async () => {
+    try {
+      const response = await api.get(`/users/danh-gia/san-pham/${id}`);
+      if (response.status === 200) {
+        setRatings(response.data.data);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy đánh giá sản phẩm:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProductDetails();
+    fetchProductRatings();
+  }, [id]);
+
+  const formatDate = (isoString) => {
+    if (!isoString) return "Không rõ";
+
+    // Cắt phần microsecond thành mili-giây (3 chữ số)
+    const fixed = isoString.replace(/\.\d+/, (m) => "." + m.slice(1, 4));
+
+    const date = new Date(fixed);
+
+    return isNaN(date.getTime())
+      ? "Không rõ"
+      : date.toLocaleDateString("vi-VN");
+  };
+
+  const calcAverageRating = (ratings) => {
+    if (!ratings || ratings.length === 0) return 0;
+
+    const total = ratings.reduce((sum, r) => sum + Number(r.sao || 0), 0);
+
+    return (total / ratings.length).toFixed(1); // làm tròn 1 chữ số
+  };
+  const average = calcAverageRating(ratings);
   return (
     <>
       {/* Product Section */}
@@ -156,32 +192,44 @@ function ProductDetail() {
           {tab === "Đánh giá" && (
             <Box>
                 <Box className="col-lg-12 col-12">
-                    <Typography variant="h6">Đánh giá: 4.0</Typography>
-                    <Rating value={4} readOnly precision={0.5} />
+                    <Typography variant="h6">Đánh giá: {average}</Typography>
+                    <Rating value={Number(average)} readOnly precision={0.5} />
                     <Typography variant="body2" className="mt-2">
-                    Tổng đánh giá:
+                    Tổng đánh giá: {ratings.length}
                     </Typography>
-
                     {/* Danh sách review */}
                     <Box className="mt-3">
-                    {[1, 2, 3].map((r) => (
-                        <Box
-                        key={r}
-                        className="review_item mb-3 p-3 border rounded"
-                        >
-                        <Box className="d-flex align-items-center mb-2">
-                            <Box>
-                            <Typography variant="subtitle1">Blake Ruiz</Typography>
-                            <Rating value={5} readOnly size="small" />
-                            </Box>
-                        </Box>
-                        <Typography variant="body2">
-                            Lorem ipsum dolor sit amet, consectetur adipisicing elit,
-                            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                      {ratings.length === 0 ? (
+                        <Typography variant="body2" className="text-muted">
+                          Chưa có đánh giá nào cho sản phẩm này.
                         </Typography>
-                        </Box>
-                    ))}
+                      ) : (
+                        ratings.map((r) => (
+                          <Box
+                            key={r.ma_danh_gia}
+                            className="review_item mb-3 p-3 border rounded shadow-sm"
+                          >
+                            <Box className="d-flex align-items-center justify-content-between">
+                              <Typography variant="subtitle1" className="fw-bold">
+                                {r.ho_ten}
+                              </Typography>
+
+                              <Typography variant="caption" className="text-muted">
+                                {formatDate(r.ngay_danh_gia)}
+                              </Typography>
+                            </Box>
+
+                            <Rating value={r.sao} readOnly size="small" className="mb-2" />
+                            <Typography variant="body2"> {r.binh_luan} </Typography>
+
+                            <Typography variant="body2">
+                              {r.noi_dung}
+                            </Typography>
+                          </Box>
+                        ))
+                      )}
                     </Box>
+                    
                 </Box>
 
                 {/* Cột phải - form review */}

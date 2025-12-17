@@ -1,71 +1,122 @@
-import { useState } from "react";
-import Banner from '../../../components/User/Home/Banner';
-import CategorySection from '../../../components/User/Home/CategorySection';
-import ProductList from '../Products/ProductList';
-import { Box, IconButton, Typography } from "@mui/material";
-import Sidebar from "../../../components/User/SideBar";
+import { useState, useEffect } from "react";
+import {
+  Box,
+  IconButton,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import Sidebar from "../../../components/User/SideBar";
+import Banner from "../../../components/User/Home/Banner";
+import KhuyenMaiSection from "../../../components/User/Khuyến mãi/KhuyenMaiSection";
+import SanPhamThinhHanh from "../Products/SanPhamThinhHanh";
+import SanPhamPhoBien from "../Products/SanPhamPhoBien";
+import SanPhamGoiYNguoiDung from "../Products/SanPhamGoiYNguoiDung";
+import { getUser } from "../../../utils/auth";
+
+const SIDEBAR_WIDTH = 300;
 
 function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const sidebarWidth = sidebarOpen ? 300 : 0;
+  const [user, setUser] = useState(null);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+
+    // ✅ lấy user khi mount
+    setUser(getUser());
+
+    const capNhatUser = () => {
+      setUser(getUser());
+    };
+
+    const capNhatKhiLogout = () => {
+      setUser(null);
+    };
+
+    window.addEventListener("user-login", capNhatUser);
+    window.addEventListener("user-logout", capNhatKhiLogout);
+
+    return () => {
+      window.removeEventListener("user-login", capNhatUser);
+      window.removeEventListener("user-logout", capNhatKhiLogout);
+    };
+  }, [isMobile]);
 
   return (
-    <Box sx={{ display: "flex", height: "100vh"}}>
-      {/* Sidebar cố định */}
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8f9fa" }}>
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {isMobile && sidebarOpen && (
+        <Box
+          onClick={() => setSidebarOpen(false)}
+          sx={{
+            position: "fixed",
+            inset: 0,
+            bgcolor: "rgba(0,0,0,0.4)",
+            zIndex: 900,
+          }}
+        />
+      )}
+
+      {/* SIDEBAR */}
       <Box
         sx={{
-          width: 300,
           position: "fixed",
-          top: 105,
+          top: isMobile ? 0 : 110,
           left: 0,
-          bottom: 0,
-          borderRight: "1px solid #ddd",
+          width: SIDEBAR_WIDTH,
+          height: isMobile ? "100vh" : "calc(100vh - 110px)",
           bgcolor: "#fff",
-          overflowY: "auto",
-          transition: "transform 0.3s ease, opacity 0.3s ease",
+          borderRight: "1px solid #e0e0e0",
           transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          opacity: sidebarOpen ? 1 : 0,
-          zIndex: 1000,
-          p: 1,
+          transition: "transform 0.3s ease",
+          zIndex: isMobile ? 900 : 600,
+          overflowY: "auto",
         }}
       >
         <Sidebar
           open={sidebarOpen}
           selectedCategory={selectedCategory}
-          onSelectCategory={(cat) => setSelectedCategory(cat)}
+          onSelectCategory={setSelectedCategory}
         />
       </Box>
 
-      {/* Nội dung chính */}
+      {/* MAIN */}
       <Box
-        sx={{
+       sx={{
           flex: 1,
-          ml: `${sidebarWidth}px`,
-          height: "100vh",
-          overflowY: "auto",
-          transition: "margin-left 0.4s ease",
-          p: 2,
-          flexDirection: "column",
+          ml: !isMobile && sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
+
+          width: !isMobile && sidebarOpen
+            ? `calc(100% - ${SIDEBAR_WIDTH}px)`
+            : "100%",
+
+          transition: "margin-left 0.3s ease, width 0.3s ease",
+          p: 3,
         }}
       >
-        {/* Nút toggle Sidebar */}
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <IconButton onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <IconButton onClick={() => setSidebarOpen((v) => !v)}>
             <MenuIcon />
           </IconButton>
-          {!sidebarOpen && (
-            <Typography variant="subtitle1" fontWeight="bold">
-              Danh mục sản phẩm
-            </Typography>
+
+          {!sidebarOpen && !isMobile && (
+            <Typography fontWeight={600}>Danh mục sản phẩm</Typography>
           )}
         </Box>
 
-        {/* Nội dung trang */}
+        <KhuyenMaiSection />
+        
         <Banner />
-        <CategorySection />
-        <ProductList sidebarOpen={sidebarOpen} />
+
+        {user && <SanPhamGoiYNguoiDung />}
+        <SanPhamPhoBien />
+        <SanPhamThinhHanh />
       </Box>
     </Box>
   );

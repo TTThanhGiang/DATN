@@ -3,9 +3,9 @@ import { Box, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead,
 import PageWrapper from "../../components/PageWrapper";
 import { EditOutlined, DeleteOutlined, CheckCircleOutline, CancelOutlined } from "@mui/icons-material";
 
-export default function ReviewManage() {
-  const [selectedReview, setSelectedReview] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
+export default function QuanLyDanhGia() {
+  const [danhGiaDangChon, setDanhGiaDangChon] = useState(null);
+  const [tabDangChon, setTabDangChon] = useState(0);
 
   const sampleReviews = [
     {
@@ -40,29 +40,29 @@ export default function ReviewManage() {
     },
   ];
 
-  const [reviews, setReviews] = useState(sampleReviews);
+  const [danhSachDanhGia, setDanhSachDanhGia] = useState(sampleReviews);
 
-  const handleTabChange = (_, newValue) => setActiveTab(newValue);
+  const xuLyDoiTab  = (_, giaTriMoi) => setTabDangChon(giaTriMoi);
 
-  const handleReviewSelect = (review) => {
-    setSelectedReview(review);
-    setActiveTab(1);
+  const xuLyChonDanhGia  = (danhGia) => {
+    setDanhGiaDangChon(danhGia);
+    setTabDangChon(1);
   };
 
-  const handleDelete = (id) => {
-    setReviews((prev) => prev.filter((r) => r.id !== id));
+  const xuLyXoaDanhGia  = (id) => {
+    setDanhSachDanhGia((truocDo ) => truocDo .filter((r) => r.id !== id));
   };
 
   return (
     <PageWrapper title="Quản lý đánh giá">
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
+        <Tabs value={tabDangChon} onChange={xuLyDoiTab}>
           <Tab label="Danh sách đánh giá" />
-          {selectedReview && <Tab label="Duyệt đánh giá" />}
+          {danhGiaDangChon && <Tab label="Duyệt đánh giá" />}
         </Tabs>
       </Box>
 
-      {activeTab === 0 && (
+      {tabDangChon === 0 && (
         <TableContainer component={Paper} sx={{ borderRadius: 2, border: "1px solid #eee" }}>
           <Table>
             <TableHead>
@@ -80,7 +80,7 @@ export default function ReviewManage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {reviews.map((r) => (
+              {danhSachDanhGia.map((r) => (
                 <TableRow key={r.id} hover>
                   <TableCell align="center">{r.id}</TableCell>
                   <TableCell>
@@ -94,10 +94,10 @@ export default function ReviewManage() {
                   <TableCell>{r.status === "approved" ? <Chip label="Đã duyệt" color="success" size="small" /> : r.status === "rejected" ? <Chip label="Từ chối" color="error" size="small" /> : <Chip label="Chờ duyệt" color="warning" size="small" />}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <IconButton color="primary" size="small" onClick={() => handleReviewSelect(r)}>
+                      <IconButton color="primary" size="small" onClick={() => xuLyChonDanhGia(r)}>
                         <EditOutlined />
                       </IconButton>
-                      <IconButton color="error" size="small" onClick={() => handleDelete(r.id)}>
+                      <IconButton color="error" size="small" onClick={() => xuLyXoaDanhGia(r.id)}>
                         <DeleteOutlined />
                       </IconButton>
                     </Stack>
@@ -109,23 +109,23 @@ export default function ReviewManage() {
         </TableContainer>
       )}
 
-      {activeTab === 1 && selectedReview && (
+      {tabDangChon === 1 && danhGiaDangChon && (
         <Box sx={{ p: 2 }}>
-          <Typography variant="h6">Duyệt đánh giá #{selectedReview.id}</Typography>
+          <Typography variant="h6">Duyệt đánh giá #{danhGiaDangChon.id}</Typography>
           <Divider sx={{ my: 2 }} />
 
           <Stack spacing={1} sx={{ mb: 2 }}>
-            <Typography><strong>Sản phẩm:</strong> {selectedReview.name}</Typography>
-            <Typography><strong>Người đánh giá:</strong> {selectedReview.user}</Typography>
-            <Typography><strong>Đánh giá:</strong> ⭐ {selectedReview.rating}</Typography>
-            <Typography><strong>Bình luận:</strong> {selectedReview.comment}</Typography>
+            <Typography><strong>Sản phẩm:</strong> {danhGiaDangChon.name}</Typography>
+            <Typography><strong>Người đánh giá:</strong> {danhGiaDangChon.user}</Typography>
+            <Typography><strong>Đánh giá:</strong> ⭐ {danhGiaDangChon.rating}</Typography>
+            <Typography><strong>Bình luận:</strong> {danhGiaDangChon.comment}</Typography>
           </Stack>
 
           <Stack direction="row" spacing={2}>
             <Button variant="contained" color="success" startIcon={<CheckCircleOutline />}>
               Duyệt
             </Button>
-            <Button variant="contained" color="error" startIcon={<CancelOutlined />} onClick={() => setSelectedReview(null)}>
+            <Button variant="contained" color="error" startIcon={<CancelOutlined />} onClick={() => setDanhGiaDangChon(null)}>
               Từ chối
             </Button>
           </Stack>

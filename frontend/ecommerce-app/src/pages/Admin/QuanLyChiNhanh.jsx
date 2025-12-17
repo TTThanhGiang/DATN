@@ -11,35 +11,25 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Button,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Stack,
-  Divider,
-  Typography,
 } from '@mui/material';
-import { EditOutlined, DeleteOutlined, AddCircleOutline } from '@mui/icons-material';
+import { EditOutlined, DeleteOutlined } from '@mui/icons-material';
 import PageWrapper from '../../components/PageWrapper';
 import BranchForm from '../../components/Admin/BranchForm';
 import api from '../../api';
 import { getToken } from '../../utils/auth';
 
-export default function BranchManage() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [branches, setBranches] = useState([]);
-  const [editBranch, setEditBranch] = useState(null);
-  const [locations, setLocations] = useState([]);
+export default function QuanLyChiNhanh() {
+  const [tabDangChon, setTabDangChon] = useState(0);
+  const [danhSachChiNhanh, setDanhSachChiNhanh] = useState([]);
+  const [chiNhanhDangSua, setChiNhanhDangSua] = useState(null);
+  const [danhSachTinhThanh, setDanhSachTinhThanh] = useState([]);
 
   const token = getToken();
-
 
   useEffect(() => {
     fetch('https://provinces.open-api.vn/api/v2/?depth=2')
       .then((res) => res.json())
-      .then((data) => setLocations(data))
+      .then((data) => setDanhSachTinhThanh(data))
       .catch((err) => console.error('Lỗi khi tải dữ liệu:', err));
     fetchBranchList();
   }, []);
@@ -50,7 +40,7 @@ export default function BranchManage() {
         headers:{ Authorization: `Bearer ${token}` },
       })
       if(res.data.success){
-        setBranches(res.data.data);
+        setDanhSachChiNhanh(res.data.data);
       }
     }catch(error){  
       console.log("Không lấy được danh sách chi nhánh", error);
@@ -58,27 +48,27 @@ export default function BranchManage() {
   }
 
   const handleTabChange = (_, newValue) => {
-    setActiveTab(newValue);
-    setEditBranch(null);
+    setTabDangChon(newValue);
+    setChiNhanhDangSua(null);
   };
 
   const handleEditClick = (branch) => {
-    setEditBranch(branch);
-    setActiveTab(1);
+    setChiNhanhDangSua(branch);
+    setTabDangChon(1);
   };
 
 
   return (
     <PageWrapper title="Quản lý chi nhánh">
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
+        <Tabs value={tabDangChon} onChange={handleTabChange}>
           <Tab label="Danh sách chi nhánh" />
-          <Tab label={editBranch ? "Cập nhật chi nhánh" : "Thêm chi nhánh"} />
+          <Tab label={chiNhanhDangSua ? "Cập nhật chi nhánh" : "Thêm chi nhánh"} />
         </Tabs>
       </Box>
 
       {/* --- TAB 1: DANH SÁCH --- */}
-      {activeTab === 0 && (
+      {tabDangChon === 0 && (
         <Box sx={{ overflowX: 'auto', mt: 2 }}>
           <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #eee' }}>
             <Table>
@@ -91,7 +81,7 @@ export default function BranchManage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {branches.map((b) => (
+                {danhSachChiNhanh.map((b) => (
                   <TableRow key={b.ma_chi_nhanh} hover>
                     <TableCell>{b.ten_chi_nhanh}</TableCell>
                     <TableCell>{b.dia_chi}</TableCell>
@@ -112,13 +102,13 @@ export default function BranchManage() {
         </Box>
       )}
 
-      {activeTab === 1 && (
+      {tabDangChon === 1 && (
       <BranchForm
-        locations={locations}
-        editBranch={editBranch}
-        onSuccess={() => {
-          setActiveTab(0);
-          setEditBranch(null);
+        danhSachTinhThanh={danhSachTinhThanh}
+        chiNhanhDangSua={chiNhanhDangSua}
+        khiThanhCong={() => {
+          setTabDangChon(0);
+          setChiNhanhDangSua(null);
           fetchBranchList()
         }}
       />

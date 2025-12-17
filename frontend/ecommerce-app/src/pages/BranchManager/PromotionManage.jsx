@@ -33,11 +33,6 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import api from "../../api";
 import { getToken } from "../../utils/auth";
 
-const samplePromotions = [
-  { id: 1, name: "Giảm 20%", code: "SALE20",branchId: 1, discount: 20, start: "2025-01-01", end: "2025-01-10", status: "pending" },
-  { id: 2, name: "Tết 30%", code: "TET30", branchId: 1, discount: 30, start: "2025-02-01", end: "2025-02-15", status: "pending" },
-];
-
 export default function PromotionManage() {
   const [activeTab, setActiveTab] = useState(0);
   const [promotionList, setPromotionList] = useState([]);

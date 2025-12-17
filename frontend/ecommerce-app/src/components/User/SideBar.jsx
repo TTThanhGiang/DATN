@@ -40,7 +40,7 @@ export default function Sidebar({ onSelectCategory }) {
 
   // ✅ Click danh mục con
   const handleSelectSubCategory = (cat, subcat) => {
-    navigate(`/categories/${cat.ma_danh_muc}/${subcat.ma_danh_muc}`);
+    navigate(`/danh-muc/${cat.ma_danh_muc}/${subcat.ma_danh_muc}`);
     onSelectCategory?.(`${cat.ten_danh_muc} / ${subcat.ten_danh_muc}`);
   };
 

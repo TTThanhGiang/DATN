@@ -1,3 +1,4 @@
+import hashlib
 import os
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -39,6 +40,9 @@ conf = ConnectionConfig(
 )
 
 fm = FastMail(conf)
+
+HOST_FRONTEND = os.getenv("HOST_FRONTEND")
+HOST_BACKEND = os.getenv("HOST_BACKEND")
 
 # cấu hình JWT
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -105,14 +109,30 @@ def phan_quyen(*allowed_roles):
         return current_user
     return checker
 
-async def gui_email_xac_thuc(email: schemas.EmailSchema, ho_ten: str):
-    token = serializer.dumps(email, salt="email-confirm")
-    link = f"http://localhost:8000/auth/xac-thuc-email/{token}"
+async def gui_email_xac_thuc(email: schemas.EmailSchema, ho_ten: str, db: Session):
+    raw_token = serializer.dumps(email, salt="email-confirm")
+
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
+    if not user:
+        return
+
+    user.email_token = token_hash
+    db.commit()
+
+    # 4. Link chỉ chứa hash
+    link = f"{HOST_BACKEND}/auth/xac-thuc-email/{token_hash}"
 
     message = MessageSchema(
         subject="Xác thực email",
         recipients=[email],
-        body=f"Chào {ho_ten}, nhấp vào link để xác thực email: {link}",
+        body=f"""
+        <p>Chào {ho_ten},</p>
+        <p>Nhấn vào link để xác thực email:</p>
+        <a href="{link}">Xác thực email</a>
+        <p>Link có hiệu lực trong 1 giờ.</p>
+        """,
         subtype="html"
     )
 
@@ -161,7 +181,7 @@ def dang_ky(user_in: schemas.UserCreate, background_tasks: BackgroundTasks, db: 
     db.commit()
     db.refresh(nguoi_dung_moi)
 
-    background_tasks.add_task(gui_email_xac_thuc, nguoi_dung_moi.email, nguoi_dung_moi.ho_ten)
+    background_tasks.add_task(gui_email_xac_thuc, nguoi_dung_moi.email, nguoi_dung_moi.ho_ten, db)
 
     return {"message": "Đăng ký thành công! Vui lòng kiểm tra email để xác thực."}
 
@@ -188,18 +208,21 @@ def cap_nhat_thong_tin(user_update: schemas.UserBase, db: Session = Depends(get_
     return current_user
 
 
-@router.get("/xac-thuc-email/{token}")
-def verify_email(token: str, db: Session = Depends(get_db)):
-    try:
-        email = serializer.loads(token, salt="email-confirm", max_age=3600)  # 1h
-    except:
-        raise HTTPException(status_code=400, detail="Link xác thực không hợp lệ hoặc hết hạn")
+@router.get("/xac-thuc-email/{token_hash}")
+def verify_email(token_hash: str, db: Session = Depends(get_db)):
+    user = db.query(NguoiDung)\
+        .filter(NguoiDung.email_token == token_hash)\
+        .first()
 
-    user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Người dùng không tồn tại")
+        raise HTTPException(
+            status_code=400,
+            detail="Link xác thực không hợp lệ hoặc đã được sử dụng"
+        )
+    user.trang_thai = True
 
-    user.trang_thai = True  # Kích hoạt tài khoản
+    user.email_token = None
+
     db.commit()
 
-    return RedirectResponse(url="http://localhost:5173", status_code=302)
+    return RedirectResponse(url=HOST_FRONTEND, status_code=302)

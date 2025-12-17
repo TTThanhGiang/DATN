@@ -3,9 +3,9 @@ import { Card, CardContent, CardMedia, Typography, Button, Box, Divider } from "
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api"
-import { getUser } from "../../../utils/auth";
+import { getToken, getUser } from "../../../utils/auth";
 
-const ProductCard = ({ product, onAddToCart }) => {
+const ProductCard = ({ product }) => {
     const {
     ma_san_pham,
     ten_san_pham,
@@ -16,6 +16,7 @@ const ProductCard = ({ product, onAddToCart }) => {
   } = product;
 
   const navigate = useNavigate();
+  const token = getToken();
 
   // Mapping nội bộ để dùng trong component
   const name = ten_san_pham;
@@ -24,30 +25,62 @@ const ProductCard = ({ product, onAddToCart }) => {
   const oldPrice = discountPercent > 0 ? Math.round(don_gia / (1 - discountPercent / 100)) : null;
   const unit = don_vi;
   const pricePerUnit = `${don_gia}/${don_vi}`;
-  const image = hinh_anhs?.[0]?.duong_dan || null;
+  const image = hinh_anhs?.[0].duong_dan || null;
 
   const formatCurrency = (num) =>
     num?.toLocaleString("vi-VN", { style: "currency", currency: "VND" }) || "";
 
   const handleClick = () => {
-    const user = getUser()
-    const token = user.token
     try {
-    api.post(
-      `/users/luu-lich-su-xem/${ma_san_pham}`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const token = getUser()?.token;
+      if(token){
+        api.post(
+        `/users/luu-lich-su-xem/${ma_san_pham}`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
       }
-    );
     }catch(error){
       console.log("Lỗi khi xem chi tiết sản phẩm", ma_san_pham)
     }
-    navigate(`/products/${ma_san_pham}`);
+    navigate(`/san-pham/${ma_san_pham}`);
 
   }
+
+  const handleAddToCart = async (product) => {
+    if (!token) {
+      alert("Vui lòng đăng nhập để thêm vào giỏ hàng");
+      navigate("/");
+      return;
+    }
+
+    try {
+      const res = await api.post(
+        "/users/them-gio-hang",
+        {
+          ma_san_pham: product.ma_san_pham,
+          so_luong: 1,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.data.success) {
+        alert("Đã thêm vào giỏ hàng");
+      } else {
+        alert(res.data.message || "Thêm thất bại");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Có lỗi xảy ra");
+    }
+    window.dispatchEvent(new Event("cart-updated"));
+  };
 
   return (
     <div >
@@ -162,7 +195,7 @@ const ProductCard = ({ product, onAddToCart }) => {
                 borderColor: "#007E42",
               },
             }}
-            onClick={() => onAddToCart?.(product)}
+            onClick={() => handleAddToCart(product)}
           >
             Mua ngay
           </Button>

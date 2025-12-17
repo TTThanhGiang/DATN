@@ -9,6 +9,7 @@ from api.routers import staff
 from api.routers import auth
 from api.routers import user
 from api.routers import admin
+from api.routers import recommend
 
 # tạo bảng lần đầu
 models.Base.metadata.create_all(bind=database.engine)
@@ -40,6 +41,7 @@ app.include_router(user.router)
 app.include_router(admin.router)
 app.include_router(manager.router)
 app.include_router(staff.router)
+app.include_router(recommend.router)
 
 
 @app.get("/")

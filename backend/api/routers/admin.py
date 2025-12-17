@@ -1,16 +1,17 @@
-from turtle import up
-from typing import Optional
+from datetime import datetime
+import json
+from typing import List, Optional
 import os
 from unittest import result
-from fastapi import APIRouter, Depends, Form, Query, UploadFile, File
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.encoders import jsonable_encoder
 from fastapi.staticfiles import StaticFiles
-from api.schemas import NguoiDungCreate, TonKhoCreate, TonKhoManyCreate, TonKhoUpdate
+from api.schemas import HinhAnhItem, KhuyenMaiAdminOut, KhuyenMaiOut, NguoiDungCreate, SanPhamKMItem, SanPhamKMItemOut, SanPhamYeuCauOut, TonKhoCreate, TonKhoManyCreate, TonKhoUpdate, TuChoiYeuCau, YeuCauNhapHangOut
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from api.database import get_db, SessionLocal
-from api.models import ChiNhanh, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, TonKho, YeuCauNhapHang
+from api.models import ChiNhanh, KhuyenMai, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, SanPhamKhuyenMai, TonKho, YeuCauNhapHang
 from api.routers.auth import lay_nguoi_dung_hien_tai, ma_hoa_mat_khau, phan_quyen
 from api.utils.response_helpers import success_response, error_response
 
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/admins", tags=["Quản trị viên"])
 # Thư mục lưu ảnh
 UPLOAD_DIR_SANPHAM = "uploads/sanphams"
 UPLOAD_DIR_DANHMUC = "uploads/danhmucs"
+UPLOAD_DIR_KHUYENMAI = "uploads/khuyenmais"
 
 # Mount thư mục mẹ ở app chính
 # app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -63,7 +65,6 @@ def danh_sach_san_pham(
         message="Thành công"
     )
 
-
 @router.post("/them-san-pham")
 async def them_san_pham(
     ten_san_pham: str = Form(...),
@@ -99,7 +100,6 @@ async def them_san_pham(
         db.commit()
 
     return success_response(data=jsonable_encoder(sp), message="Tạo sản phẩm thành công")
-
 
 @router.put("/cap-nhat-san-pham/{ma_san_pham}")
 async def cap_nhat_san_pham(
@@ -145,7 +145,6 @@ async def cap_nhat_san_pham(
 
     return success_response(data=jsonable_encoder(sp), message="Cập nhật sản phẩm thành công")
 
-
 @router.delete("/xoa-san-pham/{ma_san_pham}")
 def xoa_san_pham(   
     ma_san_pham: int,
@@ -167,7 +166,6 @@ def xoa_san_pham(
     db.delete(sp)
     db.commit()
     return success_response(data=jsonable_encoder(sp), message="Đã xóa sản phẩm và ảnh liên quan")
-
 
 # ------------------ DANH MỤC ------------------
 @router.get("/danh-muc")
@@ -416,7 +414,6 @@ async def them_nguoi_dung(
 ):
     if db.query(NguoiDung).filter((NguoiDung.so_dien_thoai == nguoidung.so_dien_thoai) | (NguoiDung.email == nguoidung.email)).first():
         return error_response(
-            data=jsonable_encoder(nguoidung),
             message="Người dùng đã tồn tại"
         )
     
@@ -466,6 +463,7 @@ def mo_khoa_tai_khoan(ma_nguoi_dung: int, currents_user: NguoiDung = Depends(pha
         data=jsonable_encoder(nguoi_dung),
         message="Đã mở khóa tài khoản người dùng"
     )
+
 # ------------------ TỒN KHO ------------------
 @router.get("/danh-sach-ton-kho")
 def lay_danh_sach_ton_kho(
@@ -619,34 +617,195 @@ def them_nhieu_ton_kho(
         "message": f"Thêm {len(added_items)} sản phẩm thành công, {len(errors)} lỗi"
     }
 
-@router.get("/danh-sach-yeu-cau-nhap-hang")
-def danh_sach_yeu_cau_nhap_hang(db: Session = Depends(get_db)):
-    # Lấy tất cả yêu cầu nhập hàng
-    yeu_cau_list = db.query(YeuCauNhapHang).order_by(YeuCauNhapHang.ngay_tao.desc()).all()
-
+# ------------------ NHẬP HÀNG ------------------
+@router.get("/danh-sach-yeu-cau")
+def lay_danh_sach_yeu_cau(
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
+    current_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai),
+    db: Session = Depends(get_db)
+):
+    total = db.query(YeuCauNhapHang).count()
+    yeu_caus = db.query(YeuCauNhapHang).order_by(desc(YeuCauNhapHang.ngay_tao)).limit(limit).offset(offset).all()
     result = []
-    for yc in yeu_cau_list:
-        san_pham_list = []
-        for spyc in yc.san_pham_yeu_caus:
-            san_pham_list.append({
-                "ma_san_pham": spyc.ma_san_pham,
-                "ten_san_pham": spyc.san_pham.ten_san_pham,
-                "so_luong": spyc.so_luong,
-                "hinh_anhs": [{"duong_dan": h.duong_dan} for h in spyc.san_pham.hinh_anhs]  # nếu cần hình
-            })
 
-        result.append({
-            "ma_yeu_cau": yc.ma_yeu_cau,
-            "ma_chi_nhanh": yc.ma_chi_nhanh,
-            "ten_chi_nhanh": yc.chi_nhanh.ten_chi_nhanh,
-            "ly_do": yc.ly_do,
-            "trang_thai": yc.trang_thai,
-            "ngay_tao": yc.ngay_tao,
-            "san_pham_yeu_caus": san_pham_list
-        })
+    for yc in yeu_caus:
+        san_phams = []
+        for sp_yc in yc.san_pham_yeu_caus:
+            san_phams.append(SanPhamYeuCauOut(
+                ma_san_pham=sp_yc.ma_san_pham,
+                ten_san_pham=sp_yc.san_pham.ten_san_pham,
+                so_luong=sp_yc.so_luong
+            ))
+        result.append(YeuCauNhapHangOut(
+            ma_yeu_cau=yc.ma_yeu_cau,
+            ma_chi_nhanh=yc.ma_chi_nhanh,
+            ten_chi_nhanh=yc.chi_nhanh.ten_chi_nhanh,
+            ly_do=yc.ly_do,
+            ly_do_tu_choi=yc.ly_do_tu_choi,
+            trang_thai=yc.trang_thai,
+            ngay_tao=yc.ngay_tao.date().isoformat(),
+            san_pham_yeu_caus=san_phams
+        ))
+    return success_response(
+        data=jsonable_encoder({
+            "items": result,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }),
+        message="Thành công"
+    )
 
-    return {
-        "success": True,
-        "data": result,
-        "message": "Lấy danh sách yêu cầu nhập hàng thành công"
-    }
+@router.put("/duyet-yeu-cau/{ma_yeu_cau}")
+def duyet_yeu_cau(ma_yeu_cau: int, current_user: NguoiDung = Depends(phan_quyen(admin)), db: Session = Depends(get_db)):
+    yeu_cau = db.query(YeuCauNhapHang).filter(YeuCauNhapHang.ma_yeu_cau == ma_yeu_cau).first()
+    if not yeu_cau:
+        raise HTTPException(status_code=400, detail="Không tồn tại yêu cầu")
+    yeu_cau.trang_thai = "DA_DUYET"
+    db.commit()
+    db.refresh(yeu_cau)
+
+    return {"success": True, "message": "Đã duyệt yêu cầu"}
+
+@router.put("/tu-choi-yeu-cau/{ma_yeu_cau}")
+def tu_choi_yeu_cau(
+    ma_yeu_cau: int, 
+    payload: TuChoiYeuCau,
+    current_user: NguoiDung = Depends(phan_quyen(admin)), 
+    db: Session = Depends(get_db)
+):
+    yeu_cau = db.query(YeuCauNhapHang).filter(YeuCauNhapHang.ma_yeu_cau == ma_yeu_cau).first()
+    if not yeu_cau:
+        raise HTTPException(status_code=400, detail="Không tồn tại yêu cầu")
+    yeu_cau.trang_thai = "DA_HUY"
+    yeu_cau.ly_do_tu_choi = payload.ly_do
+    db.commit()
+    db.refresh(yeu_cau)
+
+    return {"success": True, "message": "Đã từ chối yêu cầu"}
+
+# ------------------ KHUYẾN MÃI ------------------
+@router.post("/tao-khuyen-mai")
+async def tao_khuyen_mai(
+    ten_khuyen_mai: str = Form(...),
+    ma_code: str = Form(...),
+    mo_ta: str | None = Form(None),
+    giam_gia: float = Form(...),
+    ngay_bat_dau: datetime = Form(...),
+    ngay_ket_thuc: datetime = Form(...),
+    ma_chi_nhanh: int | None = Form(None),
+    san_phams: str | None = Form(None),  # JSON string
+    hinh_anh: Optional[UploadFile] = File(None),
+    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai),
+    db: Session = Depends(get_db)
+):
+    exits_ma_code = db.query(KhuyenMai).filter(KhuyenMai.ma_code == ma_code).first()
+    if exits_ma_code:
+        return error_response(message="Mã khuyến mãi đã tồn tại")
+    
+    if ngay_ket_thuc < ngay_bat_dau:
+        return error_response(message="ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu")
+    
+    khuyen_mai = KhuyenMai(
+        ten_khuyen_mai = ten_khuyen_mai,
+        ma_code = ma_code,
+        mo_ta = mo_ta,
+        giam_gia = giam_gia,
+        ngay_bat_dau = ngay_bat_dau,
+        ngay_ket_thuc = ngay_ket_thuc,
+        trang_thai = "DA_DUYET",
+        ma_chi_nhanh = ma_chi_nhanh if ma_chi_nhanh else None
+    )
+
+    db.add(khuyen_mai)
+    db.commit()
+    db.refresh(khuyen_mai)
+
+    if hinh_anh is not None and hinh_anh.filename:
+        os.makedirs(UPLOAD_DIR_KHUYENMAI, exist_ok=True)
+        file_path = os.path.join(UPLOAD_DIR_KHUYENMAI, hinh_anh.filename)
+        with open(file_path, "wb") as f:
+            f.write(await hinh_anh.read())
+        file_url = f"http://localhost:8000/{file_path}"
+        ha = HinhAnh(ma_khuyen_mai=khuyen_mai.ma_khuyen_mai, duong_dan=file_url, mo_ta=khuyen_mai.ten_khuyen_mai)
+        db.add(ha)
+        db.commit()
+
+    san_phams_list = []
+    if san_phams:
+        san_phams_list = [SanPhamKMItem(**item) for item in json.loads(san_phams)]
+        for sp in san_phams_list:
+            san_pham = SanPhamKhuyenMai(
+                ma_khuyen_mai = khuyen_mai.ma_khuyen_mai,
+                ma_san_pham = sp.ma_san_pham,
+                so_luong = sp.so_luong
+            )
+            db.add(san_pham)
+        db.commit()
+    return success_response(
+        data=jsonable_encoder(khuyen_mai),
+        message="Tại khuyến mãi thành công"
+    )
+
+@router.get("/danh-sach-khuyen-mai", response_model=List[KhuyenMaiOut])
+def danh_sach_khuyen_mai( db: Session = Depends(get_db), current_user: NguoiDung = Depends(phan_quyen(admin))):
+    khuyen_mais = db.query(KhuyenMai).order_by(desc(KhuyenMai.ma_khuyen_mai)).all()
+    result = []
+    for km in khuyen_mais:
+        san_phams = [
+            SanPhamKMItemOut(ma_san_pham=sp.ma_san_pham, so_luong=sp.so_luong, ten_san_pham=sp.san_pham.ten_san_pham)
+            for sp in km.san_pham_khuyen_mais
+        ]
+        hinh_anhs = [
+            HinhAnhItem(duong_dan=ha.duong_dan, mo_ta=ha.mo_ta)
+            for ha in km.hinh_anhs
+        ]
+        result.append(KhuyenMaiAdminOut(
+            ma_khuyen_mai=km.ma_khuyen_mai,
+            ten_khuyen_mai=km.ten_khuyen_mai,
+            ma_code=km.ma_code,
+            mo_ta=km.mo_ta,
+            giam_gia=float(km.giam_gia),
+            ngay_bat_dau=km.ngay_bat_dau,
+            ngay_ket_thuc=km.ngay_ket_thuc,
+            ma_chi_nhanh=km.ma_chi_nhanh,
+            ten_chi_nhanh=km.chi_nhanh.ten_chi_nhanh if km.chi_nhanh else None,
+            trang_thai=km.trang_thai,
+            san_phams=san_phams,
+            hinh_anhs=hinh_anhs
+        ))
+    return success_response(
+        data=jsonable_encoder(result),
+        message="Lấy danh sách thành công"
+    )
+
+@router.put("/duyet-khuyen-mai/{ma_khuyen_mai}")
+def duyet_khuyen_mai(
+    ma_khuyen_mai: int,
+    current_user: NguoiDung = Depends(phan_quyen(admin)),
+    db: Session = Depends(get_db)
+):
+    khuyen_mai = db.query(KhuyenMai).filter(KhuyenMai.ma_khuyen_mai == ma_khuyen_mai).first()
+    if not khuyen_mai:
+        raise HTTPException(status_code=400, detail="Không tồn tại khuyến mãi")
+    khuyen_mai.trang_thai = "DA_DUYET"
+    db.commit()
+    db.refresh(khuyen_mai)
+
+    return {"success": True, "message": "Đã duyệt khuyến mãi"}
+
+@router.put("/tu-choi-khuyen-mai/{ma_khuyen_mai}")
+def tu_choi_khuyen_mai(
+    ma_khuyen_mai: int,
+    current_user: NguoiDung = Depends(phan_quyen(admin)),
+    db: Session = Depends(get_db)
+):
+    khuyen_mai = db.query(KhuyenMai).filter(KhuyenMai.ma_khuyen_mai == ma_khuyen_mai).first()
+    if not khuyen_mai:
+        raise HTTPException(status_code=400, detail="Không tồn tại khuyến mãi")
+    khuyen_mai.trang_thai = "DA_HUY"
+    db.commit()
+    db.refresh(khuyen_mai)
+
+    return {"success": True, "message": "Đã từ chối khuyến mãi"}

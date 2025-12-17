@@ -24,50 +24,51 @@ import CategoryForm from "../../components/Admin/CategoryForm";
 
 
 export default function CategoryManage() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [categories, setCategories] = useState([]);
-  const [categoriesFull, setCategoriesFull] = useState([]);
-  const [editCategory, setEditCategory] = useState(null);
+  const [tatCaDanhMuc, setTatCaDanhMuc] = useState([]);
 
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  
-  const limit = 10;
+  const [tabDangChon, setTabDangChon] = useState(0);
+  const [danhSachDanhMuc, setDanhSachDanhMuc] = useState([]);
+  const [danhMucDangSua, setDanhMucDangSua] = useState(null);
+
+  const [trangHienTai, setTrangHienTai] = useState(1);
+  const [tongSoLuong, setTongSoLuong] = useState(0);
+
+  const gioiHan = 10;
   const token = getToken();
-  const handleTabChange = (_, value) => {
-    setActiveTab(value);
-    setEditCategory(null);
+  const xuLyDoiTab  = (_, value) => {
+    setTabDangChon(value);
+    setDanhMucDangSua(null);
   };
 
 
-  const handleEditClick = (category) => {
-    setEditCategory(category);
-    setActiveTab(1);
+  const xuLySuaDanhMuc  = (category) => {
+    setDanhMucDangSua(category);
+    setTabDangChon(1);
   };
 
   useEffect(() => {
     fetchCategories();
     fetchCategoriesFull();
-  },[page]);
+  },[trangHienTai]);
 
   const fetchCategories = async() => {
     try{
-      const offset = (page-1)* limit;
-      const res = await api.get(`admins/danh-muc?limit=${limit}&offset=${offset}`, {
+      const offset = (trangHienTai-1)* gioiHan;
+      const res = await api.get(`admins/danh-muc?limit=${gioiHan}&offset=${offset}`, {
         headers:{ Authorization: `Bearer ${token}` },
       })
       if(res.data.success){
-        setCategories(res.data.data.items);
-        setTotal(res.data.data.total);
+        setDanhSachDanhMuc(res.data.data.items);
+        setTongSoLuong(res.data.data.total);
       }
-    }catch(error){
+    }catch(err){
       console.error("Lỗi lấy danh mục:", err);
     }
   }
   const fetchCategoriesFull = async () => {
     try {
       const res = await api.get("/users/danh-muc");
-      if (res.data.success) setCategoriesFull(res.data.data);
+      if (res.data.success) setTatCaDanhMuc(res.data.data);
     } catch (err) {
       console.error("Lỗi lấy danh mục:", err);
     }
@@ -78,14 +79,14 @@ export default function CategoryManage() {
     <PageWrapper title="Quản lý danh mục">
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
+        <Tabs value={tabDangChon} onChange={xuLyDoiTab}>
           <Tab label="Danh sách danh mục" />
-          <Tab label={editCategory ? "Cập nhật danh mục": "Thêm danh mục"}/>
+          <Tab label={danhMucDangSua ? "Cập nhật danh mục": "Thêm danh mục"}/>
         </Tabs>
       </Box>
 
       {/* --- TAB 1: DANH SÁCH --- */}
-      {activeTab === 0 && (
+      {tabDangChon === 0 && (
         <Box sx={{ overflowX: "auto", mt: 2 }}>
           <TableContainer
             component={Paper}
@@ -106,7 +107,7 @@ export default function CategoryManage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {categories.map((c) => (
+                {danhSachDanhMuc.map((c) => (
                   <TableRow key={c.ma_danh_muc} hover>
                     <TableCell>
                       <img
@@ -122,7 +123,7 @@ export default function CategoryManage() {
                         <IconButton
                           color="primary"
                           size="small"
-                          onClick={() => handleEditClick(c)}
+                          onClick={() => xuLySuaDanhMuc(c)}
                         >
                           <EditOutlined />
                         </IconButton>
@@ -137,9 +138,9 @@ export default function CategoryManage() {
             </Table>
             <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
               <Pagination
-                count={Math.ceil(total / limit)}
-                page={page}
-                onChange={(_, value) => setPage(value)}
+                count={Math.ceil(tongSoLuong / gioiHan)}
+                page={trangHienTai}
+                onChange={(_, value) => setTrangHienTai(value)}
                 color="primary"
                 shape="rounded"
               />
@@ -149,13 +150,13 @@ export default function CategoryManage() {
       )}
 
       {/* Tab Thêm / Sửa */}
-            {activeTab === 1 && (
+            {tabDangChon === 1 && (
               <CategoryForm
-                categories={categoriesFull}
-                editCategory={editCategory} 
+                categories={tatCaDanhMuc}
+                editCategory={danhMucDangSua} 
                 onSuccess={() => {
-                  setActiveTab(0);
-                  setEditCategory(null);
+                  setTabDangChon(0);
+                  setDanhMucDangSua(null);
                   fetchCategories();
                 }}
               />

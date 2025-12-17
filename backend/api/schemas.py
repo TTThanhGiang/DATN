@@ -100,6 +100,7 @@ class ThanhToanSchema(BaseModel):
     ho_ten: str
     dia_chi_giao_hang: str
     so_dien_thoai: str
+    tong_tien: float
 
 class NguoiDungCreate(BaseModel):
     ho_ten: str
@@ -162,7 +163,9 @@ class YeuCauNhapHangUpdate(BaseModel):
 class YeuCauNhapHangOut(BaseModel):
     ma_yeu_cau: int
     ma_chi_nhanh: int
+    ten_chi_nhanh: str
     ly_do: str
+    ly_do_tu_choi: Optional[str] = None
     trang_thai: str
     ngay_tao: str
     san_pham_yeu_caus: List[SanPhamYeuCauOut]
@@ -230,3 +233,52 @@ class DonHangOut(BaseModel):
 class HuyDonInput(BaseModel):
     ly_do: str
 
+class CapNhatProfile(BaseModel):
+    ho_ten: str
+    email: EmailStr
+    dia_chi: str
+    ngay_sinh: datetime
+    gioi_tinh: str
+
+class ThayDoiMatKhau(BaseModel):
+    mat_khau_cu: str
+    mat_khau_moi: str
+
+class TuChoiYeuCau(BaseModel):
+    ly_do: str
+
+class KhuyenMaiAdminOut(BaseModel):
+    ma_khuyen_mai: int
+    ten_khuyen_mai: str
+    ma_code: str
+    mo_ta: Optional[str]
+    giam_gia: float
+    ngay_bat_dau: datetime
+    ngay_ket_thuc: datetime
+    ma_chi_nhanh: Optional[int]
+    ten_chi_nhanh: Optional[str] | None = None
+    trang_thai: str
+    san_phams: List[SanPhamKMItemOut] = []
+    hinh_anhs: List[HinhAnhItem] = []
+
+class FormDanhGia(BaseModel):
+    ma_san_pham: int
+    so_sao: int
+    binh_luan: str
+
+class UserCreate(BaseModel):
+    ho_ten: str
+    email: EmailStr
+    so_dien_thoai: str
+    mat_khau: str
+    dia_chi: Optional[str] = None
+    ngay_sinh: Optional[datetime] = None
+    gioi_tinh: Optional[str] = "KHAC"
+    vai_tro: Optional[str] = "KHACH_HANG"
+    ma_chi_nhanh: Optional[int] = None
+
+class UserBulkCreate(BaseModel):
+    users: List[UserCreate]
+
+class BulkReviewRequest(BaseModel):
+    so_danh_gia_moi_nguoi: int = 3

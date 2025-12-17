@@ -3,21 +3,27 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate } from "react-router-dom";
 import SearchOffcanvas from "./SearchOffcanvas";
 import AuthOffcanvas  from "../LoginOffcanvas";
-import { getToken, getRole, logout, getUserId } from "../../../utils/auth";
+import DiaChiDialog  from "../Home/DiaChiDialog";
+import { getToken, getRole, logout, getUserId, getUser } from "../../../utils/auth";
 
 
-import {IconButton, Badge, Menu, MenuItem} from '@mui/material';
-import { ShoppingCart, AccountCircle, Favorite, Search } from '@mui/icons-material';
+import {IconButton, Badge, Menu, MenuItem, Box} from '@mui/material';
+import { ShoppingCart, AccountCircle, Favorite, Search, LocationOn, Inventory2, Logout } from '@mui/icons-material';
+import api from "../../../api";
 
 function Header() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [cartItems, setCartItems] = useState([]);
+
+  const [moDiaChi, setMoDiaChi] = useState(false);
+  const [diaChi, setDiaChi] = useState("");
 
   const [anchorEl, setAnchorEl] = useState(null);
   const isMenuOpen = Boolean(anchorEl);
-  const token = getToken();
   const userId = getUserId();
+  const token = getToken();
 
   const navigate = useNavigate();
 
@@ -37,10 +43,39 @@ function Header() {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
       logout();
       setAnchorEl(null);
+      window.dispatchEvent(new Event("user-logout"));
       navigate("/");
    }
   };
 
+  useEffect(() => {
+    if (token) {
+      getSoSPGioHang();
+    }
+
+    const capNhatGioHang = () => {
+      if (token) getSoSPGioHang();
+    };
+
+    window.addEventListener("cart-updated", capNhatGioHang);
+
+    return () => {
+      window.removeEventListener("cart-updated", capNhatGioHang);
+    };
+  }, [token]);
+
+  const getSoSPGioHang = async () => {
+    try {
+      const res = await api.get(`/users/so-san-pham-trong-gio-hang`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setCartItems(res.data.data);
+    } catch (error) {
+      console.error("Lỗi lấy số SP giỏ hàng:", error);
+    }
+  };
   return (
     <header className="header"
     >
@@ -64,104 +99,157 @@ function Header() {
                 </form>
               </div>
               <div className="col-1">
-                <IconButton color="inherit" form="search-form" type="submit">
-                  <Search />
-                </IconButton>
+                <IconButton color="inherit" onClick={() => navigate("/gio-hang")}>
+                  <Badge badgeContent={cartItems} color="primary">
+                    <ShoppingCart />
+                  </Badge>
+              </IconButton>
               </div>
             </div>
           </div>
 
           {/* Support + Cart */}
-          <div className="col-sm-8 col-lg-4 d-flex justify-content-end gap-5 align-items-center mt-4 mt-sm-0 justify-content-center justify-content-sm-end">
-            <div className="support-box text-end d-none d-xl-block">
-              <span className="fs-6 text-muted">For Support?</span>
-              <h5 className="mb-0">+980-34984089</h5>
-            </div>
+          <div className="col-sm-8 col-lg-4 mt-4 mt-sm-0">
 
-            <ul className="d-flex justify-content-end list-unstyled m-0 align-items-center">
-              {/* User / Heart */}
-              <li>
-                {token ? (
-                  <a
-                  className="dropdown-toggle"
-                  href="#"
-                  id="user-dropdown"
-                  onClick={handleMenuOpen}
+            {/* ===== DESKTOP ===== */}
+            <div className="d-none d-lg-flex justify-content-end align-items-start gap-3">
+
+              {/* CỘT ĐỊA CHỈ + TÀI KHOẢN */}
+              <div className="d-flex flex-column align-items-end gap-2">
+
+                {/* ĐỊA CHỈ */}
+                <div
+                  className="d-flex align-items-center px-3 py-1"
+                  style={{
+                    background: "rgba(0,126,66,0.15)",
+                    borderRadius: 999,
+                    minWidth: 220,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setMoDiaChi(true)}
                 >
-                  <img
-                    src="/assets/images/user.png"
-                    alt="User"
-                    width={36}
-                    height={36}
-                    className="rounded-circle"
-                  />
-                </a>
-                ) : (
-                  <IconButton color="inherit" onClick={handleMenuOpen}>
-                    <AccountCircle />
-                  </IconButton>
-                )}
-                {/* Dropdown menu */}
-                <Menu
-                  anchorEl={anchorEl}
-                  open={isMenuOpen}
-                  onClose={handleMenuClose}
-                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                  transformOrigin={{ vertical: "top", horizontal: "right" }}
-                  PaperProps={{
-                    className: "dropdown-menu dropdown-menu-end show",
-                    sx: { minWidth: 160, padding: 0 },
+                  <LocationOn fontSize="small" sx={{ color: "#007E42" }} />
+                  <span className="ms-1" style={{ fontSize: 11 }}>
+                    Giao đến:
+                  </span>
+                  <span
+                    className="ms-1 fw-bold text-truncate"
+                    style={{
+                      fontSize: 12,
+                      maxWidth: 140,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {diaChi}
+                  </span>
+                </div>
+
+                {/* TÀI KHOẢN */}
+                <button
+                  onClick={handleMenuOpen}
+                  style={{
+                    background: "#006133",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px 6px 0 0",
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: 14,
+                    cursor: "pointer",
                   }}
                 >
-                  <MenuItem
-                    onClick={() => { handleMenuClose(); navigate("/profile"); }}
-                    className="dropdown-item"
-                  >
-                    Hồ sơ của tôi
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => { handleMenuClose(); navigate("/orders"); }}
-                    className="dropdown-item"
-                  >
-                    Đơn mua
-                  </MenuItem>
-                  <MenuItem
-                    onClick={handleLogout}
-                    className="dropdown-item text-danger"
-                  >
-                    Đăng xuất
-                  </MenuItem>
-                </Menu>
-              </li>
+                  <AccountCircle />
+                  <span className="ms-2">
+                    {token ? "Tài khoản của bạn" : "Đăng nhập"}
+                  </span>
+                </button>
+              </div>
+            </div>
 
-              {/* Cart icon (mobile) */}
-              <li className="d-lg-none">
-                 <IconButton color="inherit" onClick={() => setIsCartOpen(true)}>
+            {/* ===== MOBILE ===== */}
+            <div className="d-lg-none">
+              {/* HÀNG ICON */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  justifyContent: {
+                    xs: "center",   // mobile
+                    sm: "flex-end", // tablet trở lên
+                  },
+                }}
+              >
+                <IconButton onClick={() => setIsSearchOpen(true)}>
+                  <Search />
+                </IconButton>
+
+                <IconButton onClick={() => navigate("/gio-hang")}>
                   <Badge badgeContent={3} color="primary">
                     <ShoppingCart />
                   </Badge>
                 </IconButton>
-              </li>
 
-              {/* Search icon (mobile) */}
-              <li className="d-lg-none">
-                <IconButton color="inherit" onClick={() => setIsSearchOpen(true)}>
-                  <Search />
+                <IconButton onClick={handleMenuOpen}>
+                  <AccountCircle />
                 </IconButton>
-              </li>
-            </ul>
-
-            {/* Cart (desktop) */}
-            <div className="cart text-end d-none d-lg-block">
-              <button
-                className="border-0 bg-transparent d-flex flex-column gap-2 lh-1"
-                onClick={() => navigate(`/cart`)}
-              >
-                <span className="fs-6 text-muted dropdown-toggle">Giỏ hàng</span>
-                <span className="cart-total fs-5 fw-bold">100.000 đ</span>
-              </button>
+              </Box>
             </div>
+
+            <Menu
+              anchorEl={anchorEl}
+              open={isMenuOpen}
+              onClose={handleMenuClose}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              PaperProps={{
+                sx: {
+                  mt: 1,
+                  minWidth: 200,
+                  borderRadius: 2,
+                  boxShadow: "0px 8px 24px rgba(0,0,0,0.12)",
+                },
+              }}
+            >
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose();
+                  navigate("/tai-khoan");
+                }}
+                sx={{ gap: 1.5 }}
+              >
+                <AccountCircle fontSize="small" />
+                Hồ sơ của tôi
+              </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  handleMenuClose();
+                  navigate("/tai-khoan/lich-su-mua-hang");
+                }}
+                sx={{ gap: 1.5 }}
+              >
+                <Inventory2 fontSize="small" />
+                Đơn mua
+              </MenuItem>
+
+              <MenuItem
+                onClick={handleLogout}
+                sx={{
+                  gap: 1.5,
+                  color: "error.main",
+                }}
+              >
+                <Logout fontSize="small" />
+                Đăng xuất
+              </MenuItem>
+            </Menu>
           </div>
+
+          
         </div>
       </div>
 
@@ -170,6 +258,12 @@ function Header() {
       
       {/* Login Offcanvas (mobile & desktop) */}
       <AuthOffcanvas isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+
+        <DiaChiDialog
+          mo={moDiaChi}
+          dong={() => setMoDiaChi(false)}
+          onXacNhan={(diaChiDayDu) => setDiaChi(diaChiDayDu)}
+        />
     </header>
   );
 }

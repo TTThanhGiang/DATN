@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Typography, Box, IconButton, Paper } from "@mui/material";
+import {
+  Typography,
+  Box,
+  IconButton,
+  Paper,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { useParams, useNavigate } from "react-router-dom";
 
@@ -7,8 +14,7 @@ import Sidebar from "../../../components/User/SideBar";
 import ProductCard from "../../../components/User/Product/ProductCart";
 import SubCategorySwiper from "../../../components/User/Product/SubCategorySwiper";
 import api from "../../../api";
-import {getUser, getRole, getToken, getUserId} from "../../../utils/auth";
-
+import { getToken } from "../../../utils/auth";
 
 export default function ProductListPage() {
   const [products, setProducts] = useState([]);
@@ -18,152 +24,176 @@ export default function ProductListPage() {
   const [selectedSubCategory, setSelectedSubCategory] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const { categoryId, subCategoryId } = useParams();
+  const { id, subId } = useParams();
   const navigate = useNavigate();
-  const sidebarWidth = sidebarOpen ? 300 : 0;
+  const token = getToken();
 
-  const token = getToken()
+  /* ===================== RESPONSIVE ===================== */
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isTablet = useMediaQuery(theme.breakpoints.between('md', 'lg'));
+  const SIDEBAR_WIDTH = 300;
 
-  // --- Fetch tất cả sản phẩm
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+  }, [isMobile]);
+
+  /* ===================== FETCH PRODUCTS ===================== */
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const res = await api.get("/users/san-pham/");
         setProducts(res.data || []);
-      } catch (error) {
-        console.error("Lấy sản phẩm thất bại:", error);
+      } catch (err) {
+        console.error("Lấy sản phẩm thất bại:", err);
       }
     };
     fetchProducts();
   }, []);
 
-  // --- Fetch danh mục cha + con, cập nhật subCategories
+  /* ===================== FETCH CATEGORIES ===================== */
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await api.get("/users/danh-muc");
         if (res.data.success) {
           const categories = res.data.data;
-          const cat = categories.find(c => c.ma_danh_muc === Number(categoryId));
+          const cat = categories.find(
+            (c) => c.ma_danh_muc === Number(id)
+          );
           setCurrentCategory(cat || null);
           setSubCategories(cat?.danh_muc_con || []);
-          setSelectedSubCategory(subCategoryId ? Number(subCategoryId) : null);
+          setSelectedSubCategory(subId ? Number(subId) : null);
         }
-      } catch (error) {
-        console.error("Lấy danh mục thất bại:", error);
+      } catch (err) {
+        console.error("Lấy danh mục thất bại:", err);
       }
     };
     fetchCategories();
-  }, [categoryId, subCategoryId]);
+  }, [id, subId]);
 
-  // --- Filter sản phẩm theo category / subcategory
+  /* ===================== FILTER PRODUCTS ===================== */
   useEffect(() => {
-    if (!categoryId || !products.length) return;
+    if (!id || !products.length) return;
 
-    const catId = Number(categoryId);
-    const subCatId = subCategoryId ? Number(subCategoryId) : null;
+    const catId = Number(id);
+    const subCatId = subId ? Number(subId) : null;
 
-    const filtered = products.filter(p => {
-      const prodCatId = Number(p.ma_danh_muc);
-      return subCatId ? prodCatId === subCatId : prodCatId === catId;
-    });
+    const result = products.filter((p) =>
+      subCatId
+        ? Number(p.ma_danh_muc) === subCatId
+        : Number(p.ma_danh_muc) === catId
+    );
 
-    setFilteredProducts(filtered);
-  }, [products, categoryId, subCategoryId]);
+    setFilteredProducts(result);
+  }, [products, id, subId]);
 
-  // --- Thêm sản phẩm vào giỏ hàng
+  /* ===================== ADD TO CART ===================== */
   const handleAddToCart = async (product) => {
+    if (!token) {
+      alert("Vui lòng đăng nhập để thêm vào giỏ hàng");
+      navigate("/");
+      return;
+    }
+
     try {
-      if (!token) {
-        alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
-        navigate("/login");
-        return;
-      } 
-      const payload = {
-        ma_san_pham: Number(product.ma_san_pham),
-        so_luong: 1,
-      };
-      const res = await api.post("/users/them-gio-hang", payload, {
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}` 
+      const res = await api.post(
+        "/users/them-gio-hang",
+        {
+          ma_san_pham: product.ma_san_pham,
+          so_luong: 1,
         },
-      });
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
       if (res.data.success) {
-        alert("Đã thêm sản phẩm vào giỏ hàng!");
+        alert("Đã thêm vào giỏ hàng");
       } else {
-        alert("Thêm sản phẩm vào giỏ hàng thất bại: " + res.data.message);
+        alert(res.data.message || "Thêm thất bại");
       }
-    } catch (error) {
-      console.error("Lỗi thêm giỏ hàng:", error);
-      alert("Thêm sản phẩm vào giỏ hàng thất bại");
+    } catch (err) {
+      console.error(err);
+      alert("Có lỗi xảy ra");
     }
   };
 
-  // --- Chọn subcategory từ swiper
+  /* ===================== SELECT SUB CATEGORY ===================== */
   const handleSelectSubCategory = (subCat) => {
-    const subCatId = subCat.ma_danh_muc;
-    setSelectedSubCategory(subCatId);
-    navigate(`/categories/${categoryId}/${subCatId}`);
+    navigate(`/danh-muc/${id}/${subCat.ma_danh_muc}`);
   };
 
+  /* ===================== RENDER ===================== */
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      {/* SIDEBAR */}
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8f9fa" }}>
+      {/* ===== OVERLAY MOBILE ===== */}
+      {isMobile && sidebarOpen && (
+        <Box
+          onClick={() => setSidebarOpen(false)}
+          sx={{
+            position: "fixed",
+            inset: 0,
+            bgcolor: "rgba(0,0,0,0.4)",
+            zIndex: 900,
+          }}
+        />
+      )}
+
+      {/* ===== SIDEBAR ===== */}
       <Box
         sx={{
-          width: 300,
           position: "fixed",
-          top: 98,
+          top: isMobile ? 0 : 110,
           left: 0,
-          bottom: 0,
-          borderRight: "1px solid #ddd",
+          width: SIDEBAR_WIDTH,
+          height: isMobile ? "100vh" : "calc(100vh - 98px)",
           bgcolor: "#fff",
-          overflowY: "auto",
-          transition: "transform 0.3s ease, opacity 0.3s ease",
+          borderRight: "1px solid #e0e0e0",
           transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          opacity: sidebarOpen ? 1 : 0,
-          zIndex: 1000,
-          p: 1,
+          transition: "transform 0.3s ease",
+          zIndex: isMobile ? 900 : 600,
+          overflowY: "auto",
         }}
       >
-        <Sidebar open={true} selectedCategory={currentCategory?.ten_danh_muc} />
+        <Sidebar open selectedCategory={currentCategory?.ten_danh_muc} />
       </Box>
 
-      {/* MAIN CONTENT */}
+      {/* ===== MAIN CONTENT ===== */}
       <Box
         sx={{
           flex: 1,
-          ml: `${sidebarWidth}px`,
-          transition: "margin-left 0.3s ease",
+          ml: !isMobile && sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
+
+          width: !isMobile && sidebarOpen
+            ? `calc(100% - ${SIDEBAR_WIDTH}px)`
+            : "100%",
+
+          transition: "margin-left 0.3s ease, width 0.3s ease",
           p: 3,
-          display: "flex",
-          flexDirection: "column",
-          bgcolor: "#f8f9fa",
         }}
       >
         {/* HEADER */}
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <IconButton onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <IconButton onClick={() => setSidebarOpen((v) => !v)}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" fontWeight="bold" ml={1}>
-            Danh mục: {currentCategory?.ten_danh_muc || "..."}
+          <Typography variant="h6" fontWeight={600} ml={1}>
+            {currentCategory?.ten_danh_muc || "..."}
           </Typography>
         </Box>
-        {/* SUBCATEGORY SWIPER */}
+
+        {/* SUB CATEGORY */}
         {subCategories.length > 0 && (
-          <Paper
-            sx={{
-              p: 2,
+          <Paper sx={{ 
+              p: isMobile ? 1.5 : 2,
               borderRadius: 2,
-              mb: 3,
+              mb: isMobile ? 2 : 3,
               bgcolor: "white",
               boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
               width: "100%",
-              maxWidth: 1075, 
-            }}
-          >
+              overflow: "hidden",
+          }}>
             <SubCategorySwiper
               subCategories={subCategories}
               selectedSubCategory={selectedSubCategory}
@@ -171,35 +201,34 @@ export default function ProductListPage() {
             />
           </Paper>
         )}
+        
+
         {/* PRODUCT GRID */}
         {filteredProducts.length === 0 ? (
           <Typography color="text.secondary">
-            Không có sản phẩm nào trong danh mục này.
+            Không có sản phẩm nào
           </Typography>
         ) : (
           <Box
             sx={{
               display: "grid",
               gap: 2,
-              gridTemplateColumns: sidebarOpen
-                ? "repeat(auto-fill, minmax(220px, 1fr))"
-                : "repeat(auto-fill, minmax(200px, 1fr))",
+              gridTemplateColumns: {
+                xs: "repeat(2, 1fr)",
+                sm: "repeat(3, 1fr)",
+                md: "repeat(auto-fill, minmax(220px, 1fr))",
+              },
             }}
           >
             {filteredProducts.map((product) => (
-              console.log(product),
               <ProductCard
                 key={product.ma_san_pham}
                 product={product}
-                onAddToCart={handleAddToCart}
               />
-            ))}
-            
+            ))} 
           </Box>
         )}
-        
       </Box>
     </Box>
-    
   );
 }

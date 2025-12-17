@@ -1,22 +1,23 @@
-
-import base64
+import random
+from typing import List
 import datetime
 from io import BytesIO
-from fastapi import Request
+import os
+from zoneinfo import ZoneInfo
+from fastapi import Request, UploadFile
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.future import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict
-from api.models import ChiNhanh, ChiTietDonHang, ChiTietGioHang, DanhGia, DanhMucSanPham, DonHang, GioHang, LichSuXem, NguoiDung, SanPham, HinhAnh
+from typing import List
+from api.models import ChiNhanh, ChiTietDonHang, ChiTietGioHang, DanhGia, DanhMucSanPham, DonHang, GioHang, KhuyenMai, LichSuXem, NguoiDung, SanPham, HinhAnh
 from api.database import SessionLocal, get_db
-from api.schemas import DanhMucCreate, DanhMucSchema, GioHangItemCreate, GioHangItemResponse, SanPhamSchema, HinhAnhSchema, ThanhToanSchema
+from api.schemas import BulkReviewRequest, CapNhatProfile, DanhMucCreate, DanhMucSchema, DonHangOut, FormDanhGia, GioHangItemCreate, GioHangItemResponse, SanPhamDonHangOut, SanPhamSchema, HinhAnhSchema, ThanhToanSchema, ThayDoiMatKhau, UserBulkCreate
 from api.utils.response_helpers import success_response, error_response
-from api.routers.auth import lay_nguoi_dung_hien_tai
+from api.routers.auth import kiem_tra_mat_khau, lay_nguoi_dung_hien_tai, ma_hoa_mat_khau, phan_quyen
 
 router = APIRouter(prefix="/users", tags=["Người dùng"]   )
+khach_hang = "KHACH_HANG"
+
 
 def build_danh_muc_tree(danh_muc):
     return {
@@ -35,7 +36,6 @@ def build_danh_muc_tree(danh_muc):
             build_danh_muc_tree(con) for con in (danh_muc.danh_muc_con or [])
         ]
     }
-
 
 @router.get("/danh-muc", response_model=List[DanhMucSchema])
 def get_danh_muc(db: Session = Depends(get_db)):
@@ -231,8 +231,6 @@ def them_san_pham_vao_gio_hang(item: GioHangItemCreate,currents_user: NguoiDung 
         status_code=200
     )
 
-from typing import List
-
 @router.get("/gio-hang", response_model=List[GioHangItemResponse])
 def lay_gio_hang(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
     gio_hang = db.query(GioHang).filter(GioHang.ma_nguoi_dung == currents_user.ma_nguoi_dung).first()
@@ -268,6 +266,7 @@ def lay_gio_hang(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db
         message="Lấy giỏ hàng thành công.",
         status_code=200 
     )
+
 @router.delete("/xoa-san-pham-gio-hang")
 def xoa_san_pham_khoi_gio_hang(ma_san_pham: int, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
     gio_hang = db.query(GioHang).filter(GioHang.ma_nguoi_dung == currents_user.ma_nguoi_dung).first()
@@ -358,6 +357,31 @@ def lay_danh_sach_chi_nhanh(db: Session = Depends(get_db)):
         status_code=200
     )
 
+@router.get("/khuyen-mai/{ma_code}")
+def lay_thong_tin_khuyen_mai(ma_code: str, db: Session = Depends(get_db)):
+    khuyen_mai = db.query(KhuyenMai).filter(KhuyenMai.ma_code == ma_code).first()
+    if not khuyen_mai:
+        return error_response(
+            message="Mã khuyến mãi không tồn tại.", 
+            status_code=404
+        )
+    if khuyen_mai.ngay_ket_thuc < datetime.datetime.utcnow():
+        return error_response(
+            message="Mã khuyến mãi đã hết hạn.", 
+            status_code=400
+        )
+    return success_response(
+        data={
+            "ma_code": khuyen_mai.ma_code,
+            "giam_gia": float(khuyen_mai.giam_gia),
+            "ngay_bat_dau": khuyen_mai.ngay_bat_dau.isoformat(),
+            "ngay_ket_thuc": khuyen_mai.ngay_ket_thuc.isoformat(),
+            "san_pham_ap_dung": [sp.ma_san_pham for sp in khuyen_mai.san_pham_khuyen_mais]
+        },
+        message="Lấy thông tin khuyến mãi thành công.",
+        status_code=200
+    )
+
 @router.post("/thanh-toan")
 async def thanh_toan(payload: ThanhToanSchema, request: Request, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
 
@@ -377,19 +401,10 @@ async def thanh_toan(payload: ThanhToanSchema, request: Request, currents_user: 
     if not gio:
         return error_response({"error": "Giỏ hàng không tồn tại"}, 404)
 
-    # Tính tổng tiền
-    tong_tien = sum(
-        (ct.so_luong or 0) * (ct.gia_tien or 0)
-        for ct in gio.chi_tiet_gio_hangs
-    )
-
-    if tong_tien <= 0:
-        return error_response({"error": "Tổng tiền không hợp lệ"}, 400)
-
     # 1) Tạo đơn hàng
     don = DonHang(
         ma_nguoi_dung=gio.ma_nguoi_dung,
-        tong_tien=tong_tien,
+        tong_tien=payload.tong_tien,
         ho_ten=payload.ho_ten,
         ma_chi_nhanh=payload.ma_chi_nhanh,
         dia_chi=payload.dia_chi_giao_hang,
@@ -451,30 +466,6 @@ def lay_chi_tiet_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
     status_code=200
 )
 
-@router.get("/danh-gia-san-pham/{ma_san_pham}")
-def lay_danh_gia_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
-    # Giả sử có bảng DanhGia với các cột ma_san_pham, diem_danh_gia, binh_luan
-    danh_gias = db.query(DanhGia).filter(DanhGia.ma_san_pham == ma_san_pham).all()
-    if not danh_gias:
-        return error_response(
-            message="Chưa có đánh giá cho sản phẩm này.", 
-            status_code=404
-        )
-    data = [
-        {
-            "ma_nguoi_dung": dg.ma_nguoi_dung,
-            "diem_danh_gia": dg.diem_danh_gia,
-            "binh_luan": dg.binh_luan,
-            "ngay_danh_gia": dg.ngay_danh_gia.isoformat()
-        }
-        for dg in danh_gias
-    ]
-    return success_response(
-        data=data,
-        message="Lấy đánh giá sản phẩm thành công.",
-        status_code=200
-    )
-
 @router.post("/luu-lich-su-xem/{ma_san_pham}")
 def luu_lich_su_xem(ma_san_pham: int, current_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
     # Lấy ID người dùng từ token
@@ -530,3 +521,431 @@ def tat_ca_san_pham(db: Session = Depends(get_db)):
         data= jsonable_encoder(result),
         message="Lấy danh sách sản phẩm thành công"
         )
+
+
+#---------------- THÔNG TIN -----------------
+@router.get("/thong-tin-ca-nhan")
+def thong_tin_ca_nhan(current_user: NguoiDung = Depends(phan_quyen(khach_hang)), db: Session = Depends(get_db)):
+    if not current_user:
+        return error_response(message="Không tìm thấy người dùng")
+    return success_response(
+        data={
+            "ma_nguoi_dung": current_user.ma_nguoi_dung,
+            "ho_ten": current_user.ho_ten,
+            "email": current_user.email,
+            "so_dien_thoai": current_user.so_dien_thoai,
+            "dia_chi": current_user.dia_chi,
+            "ngay_sinh": current_user.ngay_sinh.date().isoformat() if current_user.ngay_sinh else None,
+            "gioi_tinh": current_user.gioi_tinh,
+            "hinh_anhs": [{"duong_dan": ha.duong_dan, "mo_ta": ha.mo_ta} for ha in current_user.hinh_anhs]
+        },
+        message="Lấy thông tin cá nhân thành công"
+    )
+
+@router.put("/cap-nhat-thong-tin")
+def cap_nhat_thong_tin(thong_tin: CapNhatProfile , current_user: NguoiDung = Depends(phan_quyen(khach_hang)), db: Session = Depends(get_db)):
+    khach_hang = db.query(NguoiDung).filter(NguoiDung.ma_nguoi_dung == current_user.ma_nguoi_dung).first()
+    if not khach_hang: 
+        return error_response(message="Không tìm thấy người dùng")
+    khach_hang.ho_ten = thong_tin.ho_ten
+    khach_hang.email = thong_tin.email
+    khach_hang.dia_chi = thong_tin.dia_chi
+    khach_hang.ngay_sinh = thong_tin.ngay_sinh
+    khach_hang.gioi_tinh = thong_tin.gioi_tinh
+    db.commit()
+    db.refresh(khach_hang)
+
+    return success_response(
+        data=jsonable_encoder(khach_hang),
+        message="Cập nhật thông tin thành công"
+    )
+
+@router.put("/thay-doi-mat-khau")
+def thay_doi_mat_khau(mat_khau: ThayDoiMatKhau ,current_user: NguoiDung = Depends(phan_quyen(khach_hang)), db:Session = Depends(get_db)):
+    nhan_vien = db.query(NguoiDung).filter(NguoiDung.ma_nguoi_dung == current_user.ma_nguoi_dung).first()
+
+    if not nhan_vien:
+        raise HTTPException(status_code=400, detail="Nhân viên không tồn tại")
+    
+    if not kiem_tra_mat_khau(mat_khau.mat_khau_cu, nhan_vien.mat_khau):
+        raise HTTPException(status_code=400, detail="Mật khẩu cũ không đúng")
+    
+    mat_khau_da_ma_hoa = ma_hoa_mat_khau(mat_khau.mat_khau_moi)
+    nhan_vien.mat_khau = mat_khau_da_ma_hoa
+    db.commit()
+    db.refresh(nhan_vien)
+
+    return {"success": True, "message": "Đổi mật khẩu thành công"}
+
+@router.put("/cap-nhat-anh")
+async def cap_nhat_avatar(
+    hinh_anh: UploadFile,
+    current_user: NguoiDung = Depends(phan_quyen(khach_hang)),
+    db: Session = Depends(get_db)
+):
+    if not hinh_anh or not hinh_anh.filename:
+        return {"success": False, "message": "Vui lòng chọn file ảnh"}
+
+    UPLOAD_DIR_AVATAR = "uploads/avatars"
+    os.makedirs(UPLOAD_DIR_AVATAR, exist_ok=True)
+
+    # Lấy avatar cũ nếu có
+    avatar_cu = db.query(HinhAnh).filter(HinhAnh.ma_nguoi_dung == current_user.ma_nguoi_dung).first()
+    if avatar_cu:
+        # Xóa file cũ trên server
+        file_cu_path = avatar_cu.duong_dan.replace("http://localhost:8000/", "")
+        if os.path.exists(file_cu_path):
+            os.remove(file_cu_path)
+        # Xóa record trong DB
+        db.delete(avatar_cu)
+        db.commit()
+
+    # Lưu file mới
+    file_path = os.path.join(UPLOAD_DIR_AVATAR, hinh_anh.filename)
+    with open(file_path, "wb") as f:
+        f.write(await hinh_anh.read())
+
+    file_url = f"http://localhost:8000/{file_path}"
+
+    # Thêm record mới
+    avatar_moi = HinhAnh(
+        ma_nguoi_dung=current_user.ma_nguoi_dung,
+        duong_dan=file_url,
+        mo_ta=f"Avatar {current_user.ho_ten}"
+    )
+    db.add(avatar_moi)
+    db.commit()
+    db.refresh(avatar_moi)
+
+    return {"success": True, "message": "Cập nhật avatar thành công", "data": avatar_moi}
+
+#---------------- LỊCH SỬ ĐƠN HÀNG -----------------
+
+@router.get("/lich-su-mua-hang")
+def lich_su_mua_hang(
+    current_user: NguoiDung = Depends(phan_quyen(khach_hang)),
+    db: Session = Depends(get_db)
+):
+    don_hangs = db.query(DonHang).filter(DonHang.ma_nguoi_dung == current_user.ma_nguoi_dung).all()
+    if not don_hangs:
+        return error_response(message="Bạn chưa có đơn hàng nào")
+    result = []
+    for dh in don_hangs:
+        ds_san_pham = []
+        for ct in dh.chi_tiet_don_hangs:
+            hinh_anh = None
+            if hasattr(ct.san_pham, "hinh_anhs") and ct.san_pham.hinh_anhs:
+                hinh_anh = ct.san_pham.hinh_anhs[0].duong_dan
+            ds_san_pham.append(
+                SanPhamDonHangOut(
+                    ma_san_pham=ct.ma_san_pham,
+                    ten_san_pham=ct.san_pham.ten_san_pham,
+                    so_luong=ct.so_luong,
+                    gia_tien=ct.gia_tien,
+                    don_vi=ct.san_pham.don_vi,
+                    hinh_anhs=hinh_anh
+                )
+            )
+        result.append(
+            DonHangOut(
+                ma_don_hang=dh.ma_don_hang,
+                ho_ten=dh.ho_ten,
+                dia_chi=dh.dia_chi,
+                so_dien_thoai=dh.so_dien_thoai,
+                trang_thai=dh.trang_thai,
+                trang_thai_thanh_toan=dh.trang_thai_thanh_toan,
+                tong_tien=dh.tong_tien,
+                ngay_dat=dh.ngay_dat,
+                chi_tiet=ds_san_pham,
+            )
+        )
+    return success_response(
+        data=jsonable_encoder(result),
+        message="Lấy danh sách đơn hàng thành công"
+    )
+
+@router.post("/gui-danh-gia")
+def gui_danh_gia(
+    payload: FormDanhGia,
+    current_user: NguoiDung = Depends(phan_quyen(khach_hang)),
+    db: Session = Depends(get_db)
+):
+    danh_gia = db.query(DanhGia).filter(
+        DanhGia.ma_san_pham == payload.ma_san_pham,
+        DanhGia.ma_nguoi_dung == current_user.ma_nguoi_dung 
+        ).all()
+    if danh_gia:
+        return error_response(message="Bạn đã đánh giá sản phẩm này")
+    danh_gia_moi = DanhGia(
+        ma_san_pham = payload.ma_san_pham,
+        ma_nguoi_dung = current_user.ma_nguoi_dung,
+        sao = payload.so_sao,
+        binh_luan = payload.binh_luan,
+    )
+    db.add(danh_gia_moi)
+    db.commit()
+    db.refresh(danh_gia_moi)
+
+    return success_response(
+        data=jsonable_encoder(danh_gia_moi),
+        message="Đã gửi đánh giá thành công"
+    )
+
+@router.get("/so-san-pham-trong-gio-hang")
+def so_san_pham_trong_gio_hang(currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+    gio_hang = db.query(GioHang).filter(GioHang.ma_nguoi_dung == currents_user.ma_nguoi_dung).first()
+    if not gio_hang:
+        return success_response(
+            data=0,
+            message="Lấy số sản phẩm trong giỏ hàng thành công."
+        )
+    so_luong = db.query(ChiTietGioHang).filter(ChiTietGioHang.ma_gio_hang == gio_hang.ma_gio_hang).count()
+    return success_response(
+        data=so_luong,
+        message="Lấy số sản phẩm trong giỏ hàng thành công."
+    )
+
+#---------------- ĐÁNH GIÁ -----------------
+
+@router.get("/danh-gia/san-pham/{ma_san_pham}")
+def lay_danh_gia_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
+    danh_gias = db.query(DanhGia).filter(DanhGia.ma_san_pham == ma_san_pham).all()
+
+    total = len(danh_gias)
+    if not danh_gias:
+        return error_response(
+            message="Chưa có đánh giá cho sản phẩm này.", 
+            status_code=404
+        )
+    result = []
+    for dg in danh_gias:
+        nguoi_dung = db.query(NguoiDung).filter(NguoiDung.ma_nguoi_dung == dg.ma_nguoi_dung).first()
+        result.append({
+            "ma_danh_gia": dg.ma_danh_gia,
+            "ho_ten": nguoi_dung.ho_ten if nguoi_dung else "Người dùng ẩn danh",
+            "sao": dg.sao,
+            "binh_luan": dg.binh_luan,
+            "ngay_danh_gia": dg.ngay_danh_gia.isoformat(),
+        })
+    return success_response(
+        data=result,
+        message="Lấy đánh giá sản phẩm thành công.",
+    )
+
+@router.get("/danh-sach-khuyen-mai")
+def lay_danh_sach_khuyen_mai(db: Session = Depends(get_db)):
+    khuyen_mais = db.query(KhuyenMai).all()
+    result = []
+    for km in khuyen_mais:
+        result.append({
+            "ma_khuyen_mai": km.ma_khuyen_mai,
+            "ten_khuyen_mai": km.ten_khuyen_mai,
+            "ma_code": km.ma_code,
+            "mo_ta": km.mo_ta,
+            "phan_tram_giam": km.giam_gia,
+            "ngay_bat_dau": km.ngay_bat_dau.date().isoformat(),
+            "ngay_ket_thuc": km.ngay_ket_thuc.date().isoformat(),
+            "hinh_anhs": [{"duong_dan": ha.duong_dan, "mo_ta": ha.mo_ta} for ha in km.hinh_anhs]
+        })
+    return success_response(
+        data=jsonable_encoder(result),    
+        message="Lấy danh sách khuyến mãi thành công."
+    )
+
+#---------------- THÊM DỮ LIỆU -----------------
+
+@router.post("/create/nguoi-dung")
+def create_users_bulk(payload: UserBulkCreate, db: Session = Depends(get_db)):
+
+    created_users = []
+    existing_errors = []
+
+    for u in payload.users:
+
+        # Kiểm tra email/phone trùng
+        exists = db.query(NguoiDung).filter(
+            (NguoiDung.email == u.email) |
+            (NguoiDung.so_dien_thoai == u.so_dien_thoai)
+        ).first()
+
+        if exists:
+            existing_errors.append({
+                "email": u.email,
+                "so_dien_thoai": u.so_dien_thoai,
+                "error": "Email hoặc số điện thoại đã tồn tại"
+            })
+            continue
+
+        hashed_password = ma_hoa_mat_khau(u.mat_khau)
+
+        new_user = NguoiDung(
+            ho_ten=u.ho_ten,
+            email=u.email,
+            so_dien_thoai=u.so_dien_thoai,
+            mat_khau=hashed_password,
+            dia_chi=u.dia_chi,
+            ngay_sinh=u.ngay_sinh,
+            gioi_tinh=u.gioi_tinh,
+            vai_tro=u.vai_tro,
+            trang_thai=True,  # Active luôn
+            ma_chi_nhanh=u.ma_chi_nhanh
+        )
+
+        db.add(new_user)
+        created_users.append({
+            "email": u.email,
+            "so_dien_thoai": u.so_dien_thoai,
+            "ho_ten": u.ho_ten
+        })
+
+    db.commit()
+
+    return {
+        "created": created_users,
+        "skipped": existing_errors,
+        "total_created": len(created_users),
+        "total_skipped": len(existing_errors)
+    }
+
+@router.post("/create/don-hang")
+def create_bulk_orders(payload: dict, db: Session = Depends(get_db)):
+    orders_data = payload.get("orders", [])
+    if not orders_data:
+        raise HTTPException(status_code=400, detail="Danh sách đơn hàng trống")
+
+    created_orders = []
+
+    for order in orders_data:
+
+        # --- Kiểm tra người dùng ---
+        nguoi_dung = db.query(NguoiDung).filter(
+            NguoiDung.ma_nguoi_dung == order["ma_nguoi_dung"]
+        ).first()
+        if not nguoi_dung:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Người dùng {order['ma_nguoi_dung']} không tồn tại"
+            )
+
+        # --- Tính tổng tiền ---
+        tong_tien = 0
+        order_items = []
+
+        for item in order["items"]:
+            san_pham = db.query(SanPham).filter(
+                SanPham.ma_san_pham == item["ma_san_pham"]
+            ).first()
+
+            if not san_pham:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Sản phẩm {item['ma_san_pham']} không tồn tại"
+                )
+
+            tong_tien += san_pham.don_gia * item["so_luong"]
+
+            order_items.append(
+                ChiTietDonHang(
+                    ma_san_pham=item["ma_san_pham"],
+                    so_luong=item["so_luong"],
+                    gia_tien=san_pham.don_gia
+                )
+            )
+
+        # --- Tạo đơn hàng ---
+        new_order = DonHang(
+            ma_nguoi_dung=order["ma_nguoi_dung"],
+            ho_ten=order["ho_ten"],
+            dia_chi=order["dia_chi"],
+            so_dien_thoai=order["so_dien_thoai"],
+            ma_chi_nhanh=order["ma_chi_nhanh"],
+            tong_tien=tong_tien
+        )
+
+        db.add(new_order)
+        db.flush()  # Lấy ma_don_hang sau khi insert
+
+        # Gắn chi tiết đơn vào
+        for item in order_items:
+            item.ma_don_hang = new_order.ma_don_hang
+            db.add(item)
+
+        created_orders.append({
+            "ma_don_hang": new_order.ma_don_hang,
+            "tong_tien": tong_tien
+        })
+
+    db.commit()
+
+    return {
+        "message": "Tạo hàng loạt đơn hàng thành công",
+        "created_orders": created_orders
+    }
+
+sample_comments = [
+    "Sản phẩm rất tốt!",
+    "Chất lượng ổn so với giá.",
+    "Đóng gói đẹp, giao nhanh.",
+    "Hơi thất vọng một chút.",
+    "Sẽ ủng hộ tiếp!",
+    "Rất đáng tiền!",
+    "Không như mong đợi.",
+    "Tôi thích sản phẩm này.",
+    "Sản phẩm hoạt động tốt.",
+    "Khá hài lòng."
+]
+
+def generate_bulk_reviews(db: Session, so_danh_gia_moi_nguoi: int = 3):
+    users = db.query(NguoiDung).all()
+    total_created = 0
+
+    for user in users:
+        # Lấy danh sách sản phẩm user đã mua
+        products = (
+            db.query(ChiTietDonHang.ma_san_pham)
+            .join(DonHang, DonHang.ma_don_hang == ChiTietDonHang.ma_don_hang)
+            .filter(DonHang.ma_nguoi_dung == user.ma_nguoi_dung)
+            .all()
+        )
+
+        product_ids = list({p.ma_san_pham for p in products})  # tránh duplicate
+
+        if not product_ids:
+            continue  # user chưa mua hàng -> bỏ qua
+
+        created_for_user = 0
+
+        random.shuffle(product_ids)
+
+        for sp_id in product_ids:
+            if created_for_user >= so_danh_gia_moi_nguoi:
+                break
+
+            # kiểm tra trùng đánh giá
+            existed = db.query(DanhGia).filter(
+                DanhGia.ma_nguoi_dung == user.ma_nguoi_dung,
+                DanhGia.ma_san_pham == sp_id
+            ).first()
+
+            if existed:
+                continue
+
+            review = DanhGia(
+                ma_san_pham=sp_id,
+                ma_nguoi_dung=user.ma_nguoi_dung,
+                sao=random.randint(3, 5),
+                binh_luan=random.choice(sample_comments),
+                trang_thai="DA_DUYET",
+            )
+
+            db.add(review)
+            created_for_user += 1
+            total_created += 1
+
+    db.commit()
+
+    return {"message": f"Đã tạo {total_created} đánh giá mới."}
+
+@router.post("/generate/danh-gia")
+def tao_danh_gia_hang_loat(request: BulkReviewRequest, db: Session = Depends(get_db)):
+    return generate_bulk_reviews(db, request.so_danh_gia_moi_nguoi)

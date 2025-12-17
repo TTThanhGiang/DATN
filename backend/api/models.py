@@ -107,11 +107,12 @@ class HinhAnh(Base):
 
     # 2. Ràng buộc XOR (Độc quyền HOẶC)
     __table_args__ = (
-        CheckConstraint(
-            "((ma_san_pham IS NOT NULL)::int + "
-            "(ma_danh_muc IS NOT NULL)::int + "
-            "(ma_khuyen_mai IS NOT NULL)::int) = 1",
-            name="ck_hinh_anh_xor_association"
+         CheckConstraint(
+        "((ma_san_pham IS NOT NULL)::int + "
+        "(ma_danh_muc IS NOT NULL)::int + "
+        "(ma_khuyen_mai IS NOT NULL)::int + "
+        "(ma_nguoi_dung IS NOT NULL)::int) = 1",
+        name="ck_hinh_anh_xor_association"
         ),
     )
 
@@ -261,6 +262,7 @@ class DanhGia(Base):
     ma_nguoi_dung = Column(Integer, ForeignKey("nguoi_dung.ma_nguoi_dung"), nullable=False)
     sao = Column(Integer, CheckConstraint("sao BETWEEN 1 AND 5", name="ck_sao_1_5"), nullable=False)
     binh_luan = Column(Text)
+    trang_thai = Column(trang_thai_yeu_cau_enum, default="CHO_XU_LY")
     ngay_danh_gia = Column(DateTime, default=datetime.utcnow)
 
     san_pham = relationship("SanPham", back_populates="danh_gias")
@@ -320,6 +322,7 @@ class YeuCauNhapHang(Base):
     ly_do = Column(Text)
     trang_thai = Column(trang_thai_yeu_cau_enum, default="CHO_XU_LY")
     ngay_tao = Column(DateTime, default=datetime.utcnow)
+    ly_do_tu_choi = Column(Text)
 
     chi_nhanh = relationship("ChiNhanh", back_populates="yeu_cau_nhap_hangs")
     san_pham_yeu_caus = relationship(

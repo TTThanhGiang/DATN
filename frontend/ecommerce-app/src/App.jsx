@@ -1,13 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 
-// User components
-import HomePage from "./pages/User/Home/Home";
-import ProductDetail from "./pages/User/Products/ProductDetail";
-import Cart from "./pages/User/Checkout/Cart";
-import UserLayout from "./layout/UserLayout";
-import Category from "./pages/User/Category/Category";
-import ProductListPage from "./pages/User/Products/Products";
+
 
 // Admin components
 import AdminLayout from "./layout/AdminLayout";
@@ -20,6 +14,14 @@ import AdminQuanLyTonKho from "./pages/Admin/QuanLyTonKho";
 import QuanLyDanhGia from "./pages/Admin/QuanLyDanhGia";
 import AdminYeuCauNhapHang from "./pages/Admin/YeuCauNhapHang";
 import AdminQuanLyKhuyenMai from "./pages/Admin/QuanLyKhuyenMai";
+
+// User page
+import UserLayout from "./layout/UserLayout";
+import HomePage from "./pages/User/Home/Home";
+import ProductDetail from "./pages/User/Products/ProductDetail";
+import Cart from "./pages/User/Checkout/Cart";
+import ProductListPage from "./pages/User/Products/Products";
+import LichSuDonHang  from "./pages/User/Account/LichSuDonHang";
 
 // Manage pages
 import QuanLyNhanVien from "./pages/BranchManager/EmployeeManage";
@@ -34,6 +36,8 @@ import Profile from "./pages/Staff/Profile";
 
 // Auth/Protected
 import ProtectedRoute from "./components/ProtectedRoute";
+import TaiKhoanNguoiDungLayOut from "./layout/TaiKhoaNguoiDungLayout";
+import ThongTinCaNhan from "./pages/User/Account/ThongTinCaNhan";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -49,10 +53,24 @@ function App() {
             <UserLayout>
               <Routes>
                 <Route path="/" element={<HomePage />} />
-                <Route path="/products/:ma_san_pham" element={<ProductDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/categories/:categoryId" element={<ProductListPage />} />
-                <Route path="/categories/:categoryId/:subCategoryId?" element={<ProductListPage />} />
+                <Route path="/san-pham/:id" element={<ProductDetail />} />
+                <Route path="/gio-hang" element={<Cart />} />
+                <Route path="/danh-muc/:id" element={<ProductListPage />} />
+                <Route path="/danh-muc/:id/:subId?" element={<ProductListPage />} />
+                {/* ===========================
+                KHU VỰC QUẢN LÝ TÀI KHOẢN
+              ============================ */}
+                <Route path="/tai-khoan" element={<TaiKhoanNguoiDungLayOut />}>
+                  <Route index element={<ThongTinCaNhan />} />
+                  <Route path="thong-tin" element={<ThongTinCaNhan />} />
+                  <Route path="lich-su-mua-hang" element={<LichSuDonHang />} />
+                  {/*
+                  <Route path="doi-mat-khau" element={<DoiMatKhau />} />
+                  <Route path="dia-chi" element={<DiaChi />} /> */}
+
+                  {/* Mặc định khi truy cập /tai-khoan */}
+
+                </Route>
               </Routes>
             </UserLayout>
           }

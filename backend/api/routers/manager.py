@@ -13,12 +13,13 @@ from sqlalchemy.orm import Session
 
 from api.database import get_db, SessionLocal
 from api.models import ChiNhanh, DonHang, KhuyenMai, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, SanPhamKhuyenMai, SanPhamYeuCau, TonKho, YeuCauNhapHang
-from api.routers.auth import lay_nguoi_dung_hien_tai, ma_hoa_mat_khau
+from api.routers.auth import lay_nguoi_dung_hien_tai, ma_hoa_mat_khau, phan_quyen
 from api.utils.response_helpers import success_response, error_response
 
 UPLOAD_DIR_KHUYENMAI = "uploads/khuyenmais"
 
 router = APIRouter(prefix="/manager", tags=["Quản lý"])
+manager = "QUAN_LY"
 
 #---------------- NHÂN VIÊN -----------------
 @router.get("/danh-sach-nhan-vien")
@@ -342,7 +343,9 @@ def lay_danh_sach_yeu_cau(
         result.append(YeuCauNhapHangOut(
             ma_yeu_cau=yc.ma_yeu_cau,
             ma_chi_nhanh=yc.ma_chi_nhanh,
+            ten_chi_nhanh=yc.chi_nhanh.ten_chi_nhanh,
             ly_do=yc.ly_do,
+            ly_do_tu_choi=yc.ly_do_tu_choi,
             trang_thai=yc.trang_thai,
             ngay_tao=yc.ngay_tao.isoformat(),
             san_pham_yeu_caus=san_phams

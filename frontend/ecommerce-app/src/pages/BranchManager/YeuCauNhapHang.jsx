@@ -69,11 +69,11 @@ export default function YeuCauNhapHang(){
         return <Chip label={map[feStatus].label} color={map[feStatus].color} size="small" />;
     };
 
-
     const handleTabChange = (_,value) =>{
         setActiveTab(value);
         setRequestDetail(null);
         setSelectedProducts([]);
+        setReason("");
         setSearch("");
     }
 
@@ -244,7 +244,7 @@ export default function YeuCauNhapHang(){
                 </Tabs>
             </Box>
             {activeTab === 0 && (
-                <Box sx={{ overflowX: "auto", mt: 2 }}>
+            <Box sx={{ overflowX: "auto", mt: 2 }}>
                 <TableContainer component={Paper} sx={{ borderRadius: 2, border: "1px solid #eee" }}>
                     <Table>
                     <TableHead>
@@ -345,6 +345,15 @@ export default function YeuCauNhapHang(){
                     value={reason}
                     onChange={e => setReason(e.target.value)}
                 />
+                {requestDetail && (
+                <TextField
+                    fullWidth
+                    label="Lý do từ chối"
+                    value={requestDetail.ly_do_tu_choi || ""}
+                    disabled
+                    sx={{ mt: 2 }}
+                />
+                )}
                 <Divider sx={{ my: 2 }} />
                 <Stack justifyContent="center">
                     {requestDetail ? (

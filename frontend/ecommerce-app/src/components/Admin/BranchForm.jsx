@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Stack, TextField, FormControl, InputLabel, Select, MenuItem, Button, Divider, Autocomplete } from '@mui/material';
+import { Stack, TextField, Button, Divider, Autocomplete } from '@mui/material';
 import AddCircleOutline from '@mui/icons-material/AddCircleOutline';
 import api from '../../api';
 import { getToken } from '../../utils/auth';
 
-export default function BranchForm({ locations, editBranch, onSuccess }) {
-  const [wards, setWards] = useState([]);
+export default function FormChiNhanh({ danhSachTinhThanh, chiNhanhDangSua, khiThanhCong }) {
+  const [danhSachXa, setDanhSachXa] = useState([]);
   const token = getToken();
-  const [formData, setFormData] = useState({
+
+  const [duLieuForm, setDuLieuForm] = useState({
     ten_chi_nhanh: '',
     dia_chi: '',
     so_dien_thoai: '',
@@ -15,122 +16,147 @@ export default function BranchForm({ locations, editBranch, onSuccess }) {
     xa: '',
   });
 
-  const provinceName = locations.find(p => p.code === formData.thanh_pho)?.name || "";
-  const wardName = wards.find(w => w.code === formData.xa)?.name || "";
+  const tenTinhThanh = danhSachTinhThanh.find(t => t.code === duLieuForm.thanh_pho)?.name || '';
+  const tenXaPhuong = danhSachXa.find(x => x.code === duLieuForm.xa)?.name || '';
 
-  const payload = {
-    ...formData,
-    thanh_pho: provinceName,
-    xa: wardName
+  const duLieuGuiDi = {
+    ...duLieuForm,
+    thanh_pho: tenTinhThanh,
+    xa: tenXaPhuong,
   };
 
   useEffect(() => {
-    if (editBranch) {
-      // Tách địa chỉ và tìm tỉnh / xã
-      const parts = editBranch.dia_chi.split(',').map(p => p.trim());
-      const [street, wardName, provinceName] = parts;
+    if (chiNhanhDangSua) {
+      // Tách địa chỉ để tìm tỉnh/thành và xã/phường
+      const cacPhan = chiNhanhDangSua.dia_chi.split(',').map(p => p.trim());
+      const [duongPho, tenXa, tenTinh] = cacPhan;
 
-      const foundProvince = locations.find(
-        p => provinceName && (p.name.includes(provinceName) || provinceName.includes(p.name))
+      const tinhTimDuoc = danhSachTinhThanh.find(
+        t => tenTinh && (t.name.includes(tenTinh) || tenTinh.includes(t.name))
       );
 
-      const foundWard = foundProvince?.wards.find(
-        w => wardName && (w.name.includes(wardName) || wardName.includes(w.name))
+      const xaTimDuoc = tinhTimDuoc?.wards.find(
+        x => tenXa && (x.name.includes(tenXa) || tenXa.includes(x.name))
       );
 
-      setWards(foundProvince?.wards || []);
-      setFormData({
-        ten_chi_nhanh: editBranch.ten_chi_nhanh,
-        dia_chi: street || '',
-        so_dien_thoai: editBranch.so_dien_thoai,
-        thanh_pho: foundProvince?.code || '',
-        xa: foundWard?.code || '',
+      setDanhSachXa(tinhTimDuoc?.wards || []);
+      setDuLieuForm({
+        ten_chi_nhanh: chiNhanhDangSua.ten_chi_nhanh,
+        dia_chi: duongPho || '',
+        so_dien_thoai: chiNhanhDangSua.so_dien_thoai,
+        thanh_pho: tinhTimDuoc?.code || '',
+        xa: xaTimDuoc?.code || '',
       });
     } else {
-      setFormData({
+      setDuLieuForm({
         ten_chi_nhanh: '',
         dia_chi: '',
         so_dien_thoai: '',
         thanh_pho: '',
         xa: '',
       });
-      setWards([]);
+      setDanhSachXa([]);
     }
-  }, [editBranch, locations]);
+  }, [chiNhanhDangSua, danhSachTinhThanh]);
 
-  const handleChange = e => {
+  const xuLyThayDoi = e => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setDuLieuForm(truocDo => ({ ...truocDo, [name]: value }));
   };
 
-  const handleSubmit = async () => {
-    try{
-      let res;
-      if(editBranch){
-        res = await api.put(`/admins/cap-nhat-chi-nhanh/${editBranch.ma_chi_nhanh}`, payload, {
+  const xuLyLuu = async () => {
+    try {
+      let ketQua;
+      if (chiNhanhDangSua) {
+        ketQua = await api.put(
+          `/admins/cap-nhat-chi-nhanh/${chiNhanhDangSua.ma_chi_nhanh}`,
+          duLieuGuiDi,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+      } else {
+        ketQua = await api.post('/admins/them-chi-nhanh', duLieuGuiDi, {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
+            'Content-Type': 'multipart/form-data',
           },
-        })
-        console.log(payload);
-      } else {
-        res = await api.post(`/admins/them-chi-nhanh`, payload, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        })
+        });
       }
-      if (res.data.success) {
-        alert(editBranch ? "Cập nhật thành công!" : "Tạo chi nhánh thành công!");
-        onSuccess?.();
+
+      if (ketQua.data.success) {
+        alert(chiNhanhDangSua ? 'Cập nhật thành công!' : 'Tạo chi nhánh thành công!');
+        khiThanhCong?.();
       } else {
-        alert(res.data.message);
+        alert(ketQua.data.message);
       }
-    } catch (err) {
-      console.error(err);
-      alert("Lỗi khi lưu danh mục!");
+    } catch (loi) {
+      console.error(loi);
+      alert('Lỗi khi lưu chi nhánh!');
     }
   };
 
   return (
     <Stack spacing={3}>
-      <TextField label="Tên chi nhánh" name="ten_chi_nhanh" value={formData.ten_chi_nhanh} onChange={handleChange} fullWidth />
-      <TextField label="Số điện thoại" name="so_dien_thoai" value={formData.so_dien_thoai} onChange={handleChange} fullWidth />
-      <TextField label="Địa chỉ" name="dia_chi" value={formData.dia_chi} onChange={handleChange} fullWidth />
-      <Autocomplete
-        options={locations}
-        getOptionLabel={(option) => option.name}
-        value={locations.find(p => p.code === formData.thanh_pho) || null}
-        onChange={(event, newValue) => {
-          setFormData(prev => ({
-            ...prev,
-            thanh_pho: newValue?.code || '',
-            xa: ''
-          }));
-          setWards(newValue?.wards || []);
-        }}
-        renderInput={(params) => <TextField {...params} label="Tỉnh / Thành phố" />}
+      <TextField
+        label="Tên chi nhánh"
+        name="ten_chi_nhanh"
+        value={duLieuForm.ten_chi_nhanh}
+        onChange={xuLyThayDoi}
+        fullWidth
+      />
+
+      <TextField
+        label="Số điện thoại"
+        name="so_dien_thoai"
+        value={duLieuForm.so_dien_thoai}
+        onChange={xuLyThayDoi}
+        fullWidth
+      />
+
+      <TextField
+        label="Địa chỉ"
+        name="dia_chi"
+        value={duLieuForm.dia_chi}
+        onChange={xuLyThayDoi}
+        fullWidth
       />
 
       <Autocomplete
-        options={wards}
-        getOptionLabel={(option) => option.name}
-        value={wards.find(w => w.code === formData.xa) || null}
-        onChange={(event, newValue) => {
-          setFormData(prev => ({
-            ...prev,
-            xa: newValue?.code || ''
+        options={danhSachTinhThanh}
+        getOptionLabel={option => option.name}
+        value={danhSachTinhThanh.find(t => t.code === duLieuForm.thanh_pho) || null}
+        onChange={(event, giaTriMoi) => {
+          setDuLieuForm(truocDo => ({
+            ...truocDo,
+            thanh_pho: giaTriMoi?.code || '',
+            xa: '',
+          }));
+          setDanhSachXa(giaTriMoi?.wards || []);
+        }}
+        renderInput={params => <TextField {...params} label="Tỉnh / Thành phố" />}
+      />
+
+      <Autocomplete
+        options={danhSachXa}
+        getOptionLabel={option => option.name}
+        value={danhSachXa.find(x => x.code === duLieuForm.xa) || null}
+        onChange={(event, giaTriMoi) => {
+          setDuLieuForm(truocDo => ({
+            ...truocDo,
+            xa: giaTriMoi?.code || '',
           }));
         }}
-        renderInput={(params) => <TextField {...params} label="Xã / Phường" />}
+        renderInput={params => <TextField {...params} label="Xã / Phường" />}
       />
 
       <Divider sx={{ my: 2 }} />
 
-      <Button variant="contained" startIcon={<AddCircleOutline />} onClick={handleSubmit}>
-        {editBranch ? 'Lưu thay đổi' : 'Tạo chi nhánh'}
+      <Button variant="contained" startIcon={<AddCircleOutline />} onClick={xuLyLuu}>
+        {chiNhanhDangSua ? 'Lưu thay đổi' : 'Tạo chi nhánh'}
       </Button>
     </Stack>
   );
