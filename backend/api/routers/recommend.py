@@ -1,127 +1,153 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from api.recommendation.load_data import nap_du_lieu
+from api.utils.redis_cache import lay_cache, luu_cache, xoa_cache_theo_pattern
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 from api.database import get_db
-from api.utils.recommender import get_trending_by_category, goi_y_ket_hop, goi_y_nguoi_dung, goi_y_noi_dung, goi_y_pho_bien, goi_y_pho_bien_cho_guest, goi_y_san_pham, goi_y_trending_theo_danh_muc
+from api.utils.recommender import get_trending_by_category
 from api.models import ChiTietDonHang, DanhGia, DanhMucSanPham, DonHang, LichSuXem, SanPham
+
+from api.recommendation.recommender import goi_y_pho_bien, goi_y_ket_hop, goi_y_pho_bien_cho_guest, goi_y_thinh_hanh_theo_danh_muc
 
 router = APIRouter(prefix="/goi-y", tags=["Gợi ý"])
 
-def format_san_pham(ds):
+def gan_san_pham_orm(ds_goi_y, db):
     """
-    Chuẩn hóa output của danh sách sản phẩm gợi ý
-    Bao gồm: id, tên, giá, giảm giá, đơn vị, danh mục, mô tả, hình ảnh, score, phương pháp
+    ds_goi_y: output từ recommender
+    return: list đúng format cho format_san_pham
     """
-    result = []
-    for sp in ds:
-        s = sp["san_pham"]
-        result.append({
-            "ma_san_pham": s.ma_san_pham,
-            "ten_san_pham": s.ten_san_pham,
-            "mo_ta": getattr(s, "mo_ta", None),
-            "don_gia": getattr(s, "don_gia", None),
-            "giam_gia": float(getattr(s, "giam_gia", 0)),
-            "don_vi": getattr(s, "don_vi", None),
-            "id_danh_muc": getattr(s, "ma_danh_muc", None),
-            "hinh_anhs": [{"duong_dan": ha.duong_dan} for ha in getattr(s, "hinh_anhs", [])],
-            "score": sp.get("score"),
-            "method": sp.get("method") or ", ".join(sp.get("methods", []))
+    if not ds_goi_y:
+        return []
+
+    # lấy danh sách id
+    ds_id = [sp["ma_san_pham"] for sp in ds_goi_y]
+
+    san_phams = (
+        db.query(SanPham)
+        .filter(SanPham.ma_san_pham.in_(ds_id))
+        .all()
+    )
+
+    map_sp = {sp.ma_san_pham: sp for sp in san_phams}
+
+    ket_qua = []
+    for r in ds_goi_y:
+        sp = map_sp.get(r["ma_san_pham"])
+        if not sp:
+            continue
+
+        ket_qua.append({
+            "ma_san_pham": sp.ma_san_pham,
+            "ten_san_pham": sp.ten_san_pham,
+            "mo_ta": getattr(sp, "mo_ta", None),
+            "don_gia": getattr(sp, "don_gia", None),
+            "giam_gia": float(getattr(sp, "giam_gia", 0)),
+            "don_vi": getattr(sp, "don_vi", None),
+            "id_danh_muc": getattr(sp, "ma_danh_muc", None),
+            "hinh_anhs": [
+                {"duong_dan": ha.duong_dan}
+                for ha in getattr(sp, "hinh_anhs", [])
+            ],
+            "score": r.get("diem"),
+            "method": r.get("phuong_phap")
         })
-    return result
 
-@router.get("/goi-y/noi-dung/{ma_nguoi_dung}")
-def api_goi_y_noi_dung(ma_nguoi_dung: int, db: Session = Depends(get_db)):
-    ket_qua = goi_y_noi_dung(ma_nguoi_dung, db)
-    if not ket_qua:
-        raise HTTPException(status_code=404, detail="Không có sản phẩm gợi ý")
-    return {
-        "ma_nguoi_dung": ma_nguoi_dung,
-        "so_luong_goi_y": len(ket_qua),
-        "goi_y": format_san_pham(ket_qua)
-    }
-
-@router.get("/goi-y/nguoi-dung/{ma_nguoi_dung}")
-def api_goi_y_nguoi_dung(ma_nguoi_dung: int, db: Session = Depends(get_db)):
-    ket_qua = goi_y_nguoi_dung(ma_nguoi_dung, db)
-    if not ket_qua:
-        raise HTTPException(status_code=404, detail="Không có sản phẩm gợi ý")
-    return {
-        "ma_nguoi_dung": ma_nguoi_dung,
-        "so_luong_goi_y": len(ket_qua),
-        "goi_y": format_san_pham(ket_qua)
-    }
-
-@router.get("/goi-y/san-pham/{ma_nguoi_dung}")
-def api_goi_y_san_pham(ma_nguoi_dung: int, db: Session = Depends(get_db)):
-    ket_qua = goi_y_san_pham(ma_nguoi_dung, db)
-    if not ket_qua:
-        raise HTTPException(status_code=404, detail="Không có sản phẩm gợi ý")
-    return {
-        "ma_nguoi_dung": ma_nguoi_dung,
-        "so_luong_goi_y": len(ket_qua),
-        "goi_y": format_san_pham(ket_qua)
-    }
-
-@router.get("/goi-y/pho-bien/{ma_nguoi_dung}")
-def api_goi_y_pho_bien(ma_nguoi_dung: int, db: Session = Depends(get_db)):
-    ket_qua = goi_y_pho_bien(ma_nguoi_dung, db)
-    if not ket_qua:
-        raise HTTPException(status_code=404, detail="Không có sản phẩm gợi ý")
-    return {
-        "ma_nguoi_dung": ma_nguoi_dung,
-        "so_luong_goi_y": len(ket_qua),
-        "goi_y": format_san_pham(ket_qua)
-    }
-
-# ----------------- Endpoint tổng hợp -----------------
-
-@router.get("/tong-hop/{ma_nguoi_dung}")
-def api_goi_y_tong_hop(ma_nguoi_dung: int, db: Session = Depends(get_db), top_n: int = 10):
-    ket_qua = goi_y_ket_hop(ma_nguoi_dung, db, top_n=top_n)
-    if not ket_qua:
-        raise HTTPException(status_code=404, detail="Không có sản phẩm gợi ý")
-    return {
-        "ma_nguoi_dung": ma_nguoi_dung,
-        "so_luong_goi_y": len(ket_qua),
-        "goi_y": format_san_pham(ket_qua)
-    }
+    return ket_qua
 
 @router.get("/pho-bien-cho-guest")
-def api_goi_y_tong_hop(db: Session = Depends(get_db)):
-    ket_qua = goi_y_pho_bien_cho_guest(db, top_n=20)
-    if not ket_qua:
-        raise HTTPException(status_code=404, detail="Không có sản phẩm gợi ý")
-    return {
+def api_goi_y_pho_bien_guest(db: Session = Depends(get_db)):
+    cache_key = "guest:pho_bien"
+
+    du_lieu_cache = lay_cache(cache_key)
+    if du_lieu_cache and du_lieu_cache.get("so_luong_goi_y", 0) > 0:
+        return du_lieu_cache
+    
+    du_lieu = nap_du_lieu(db)
+    ds_goi_y = goi_y_pho_bien_cho_guest(du_lieu)
+    ket_qua = gan_san_pham_orm(ds_goi_y, db)
+
+    response = {
         "so_luong_goi_y": len(ket_qua),
-        "goi_y": format_san_pham(ket_qua)
+        "goi_y": ket_qua
     }
+
+    if ket_qua:
+        luu_cache(cache_key, response, ttl=300)
+
+    return response
 
 @router.get("/trending/danh-muc")
 def api_trending_theo_danh_muc(
     db: Session = Depends(get_db),
-    days: int = 7,
+    days: int = 30,
     top_dm: int = 3,
     top_sp: int = 20
 ):
-    raw_result = get_trending_by_category(db, days, top_dm, top_sp)
+    cache_key = f"trending:danh_muc:days={days}:topdm={top_dm}:topsp={top_sp}"
+
+    du_lieu_cache = lay_cache(cache_key)
+    if du_lieu_cache:
+        return du_lieu_cache
+    du_lieu = nap_du_lieu(db)
+    ds_goi_y = goi_y_thinh_hanh_theo_danh_muc(
+        du_lieu,
+        so_ngay=days, 
+        top_danh_muc=top_dm, 
+        top_san_pham=top_sp
+    )
 
     output = {}
 
-    for dm_id, ds_sp in raw_result.items():
+    for dm_id, ds_sp in ds_goi_y.items():
 
-        # Lấy tên danh mục
-        dm = db.query(DanhMucSanPham).filter(DanhMucSanPham.ma_danh_muc == dm_id).first()
+        dm = (
+            db.query(DanhMucSanPham)
+            .filter(DanhMucSanPham.ma_danh_muc == int(dm_id))
+            .first()
+        )
         ten_dm = dm.ten_danh_muc if dm else "Không xác định"
 
-        # Tính điểm của danh mục = tổng score sp
-        diem_danh_muc = sum(item["score"] for item in ds_sp)
+        diem_danh_muc = sum(item["diem"] for item in ds_sp)
 
-        # Format danh sách sản phẩm
-        output[dm_id] = {
+        output[str(dm_id)] = {
             "ma_danh_muc": dm_id,
             "ten_danh_muc": ten_dm,
-            "score_danh_muc": diem_danh_muc,
-            "san_phams": format_san_pham(ds_sp)
+            "score_danh_muc": round(diem_danh_muc, 2),
+            "san_phams": gan_san_pham_orm(ds_sp, db)
         }
 
+    if output:
+        luu_cache(cache_key, output, ttl=300)
+
     return output
+
+@router.get("/tong-hop/{ma_nguoi_dung}")
+def api_goi_y(
+    ma_nguoi_dung: int,
+    db: Session = Depends(get_db)
+):
+    cache_key = f"goi_y:tong_hop:user:{ma_nguoi_dung}"
+
+
+    du_lieu_cache = lay_cache(cache_key)
+    if du_lieu_cache and du_lieu_cache.get("so_luong_goi_y", 0) > 0:
+        return du_lieu_cache
+
+    du_lieu = nap_du_lieu(db)
+    ds_goi_y = goi_y_ket_hop(ma_nguoi_dung, du_lieu)
+    ds_orm = gan_san_pham_orm(ds_goi_y, db)
+
+    response = {
+        "ma_nguoi_dung": ma_nguoi_dung,
+        "so_luong_goi_y": len(ds_orm),
+        "goi_y": ds_orm
+    }
+    if ds_orm:
+        luu_cache(cache_key, response, ttl=120)
+
+    return response
+
+@router.get("/data")
+def data(db: Session = Depends(get_db)):
+    return nap_du_lieu(db)   
+    

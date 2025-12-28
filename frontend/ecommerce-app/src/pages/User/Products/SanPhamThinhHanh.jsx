@@ -1,134 +1,155 @@
 import { useState, useEffect } from "react";
-import { Box, Button  } from "@mui/material";
-import ProductCard from "../../../components/User/Product/ProductCart";
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  Tabs, 
+  Tab, 
+  CircularProgress, 
+  Stack 
+} from "@mui/material";
+import ProductCard from "../../../components/User/Product/TheSanPham";
 import api from "../../../api";
 
-export default function ProductList({ sidebarOpen }) {
-  const [activeTab, setActiveTab] = useState("all");
-  const [loading, setLoading] = useState(true);
+export default function DanhSachSanPhamXuHuong() {
+  const [tabHienTai, setTabHienTai] = useState("tat_ca");
+  const [dangTai, setDangTai] = useState(true);
 
-  const [categories, setCategories] = useState({});
-  const [allProducts, setAllProducts] = useState([]);
+  const [danhMuc, setDanhMuc] = useState({});
+  const [tatCaSanPham, setTatCaSanPham] = useState([]);
 
-  const DEFAULT_LIMIT = 10;
-  const [visibleCount, setVisibleCount] = useState(DEFAULT_LIMIT);
+  const GIOI_HAN_MAC_DINH = 10;
+  const [soLuongHienThi, setSoLuongHienThi] = useState(GIOI_HAN_MAC_DINH);
 
   useEffect(() => {
-    const fetchTrending = async () => {
+    const taiSanPhamXuHuong = async () => {
       try {
-        const res = await api.get("/goi-y/trending/danh-muc");
-        const data = res.data;
+        const phanHoi = await api.get("/goi-y/trending/danh-muc");
+        const duLieu = phanHoi.data;
 
-        setCategories(data);
+        setDanhMuc(duLieu);
 
-        const merged = Object.values(data)
-          .flatMap((dm) => dm.san_phams);
-
-        setAllProducts(merged);
+        // Hợp nhất tất cả sản phẩm từ các danh mục vào một mảng duy nhất
+        const mangHopNhat = Object.values(duLieu).flatMap((dm) => dm.san_phams);
+        setTatCaSanPham(mangHopNhat);
+        console.log(duLieu)
       } catch (err) {
-        console.error("Lỗi fetch trending:", err);
+        console.error("Lỗi khi tải sản phẩm xu hướng:", err);
+      } finally {
+        setDangTai(false);
       }
-      setLoading(false);
     };
 
-    fetchTrending();
+    taiSanPhamXuHuong();
   }, []);
 
-  const changeTab = (tab) => {
-    setActiveTab(tab);
-    setVisibleCount(DEFAULT_LIMIT);
+  // Xử lý khi chuyển Tab
+  const thayDoiTab = (event, giaTriMoi) => {
+    setTabHienTai(giaTriMoi);
+    setSoLuongHienThi(GIOI_HAN_MAC_DINH);
   };
 
-  const renderProducts = (items) =>
-     items.slice(0, visibleCount).map((p) => (
-      <ProductCard 
-        key={p.ma_san_pham} 
-        product={{ ...p, quantity: 1 }} 
-        onAddToCart={() => console.log("Add to cart", p)} 
-      />
-    ));
+  // Lọc danh sách sản phẩm dựa trên Tab
+  const danhSachLoc =
+    tabHienTai === "tat_ca"
+      ? tatCaSanPham
+      : danhMuc[tabHienTai]?.san_phams || [];
 
-  if (loading) return <p>Loading...</p>;
+  const coTheXemThem = soLuongHienThi < danhSachLoc.length;
 
-  // Lấy danh sách sản phẩm của tab hiện tại
-  const currentProducts =
-    activeTab === "all"
-      ? allProducts
-      : categories[activeTab]?.san_phams || [];
-
-  const canShowMore = visibleCount < currentProducts.length;  
+  if (dangTai) {
+    return (
+      <Stack alignItems="center" py={5}>
+        <CircularProgress />
+        <Typography mt={2}>Đang tải sản phẩm xu hướng...</Typography>
+      </Stack>
+    );
+  }
 
   return (
-    <section className="py-5">
-      <div className="container-fluid">
-        <div className="bootstrap-tabs product-tabs">
+    <Box component="section" sx={{ py: 4 }}>
+      {/* Tiêu đề và Tabs điều hướng */}
+      <Box 
+        sx={{ 
+          display: "flex", 
+          flexDirection: { xs: "column", md: "row" },
+          justifyContent: "space-between",
+          alignItems: { xs: "flex-start", md: "center" },
+          borderBottom: 1, 
+          borderColor: "divider",
+          mb: 4,
+          pb: 1
+        }}
+      >
+        <Typography variant="h5" fontWeight={700} color="primary.main">
+          Xu hướng thị trường
+        </Typography>
 
-          {/* Tabs Header */}
-          <div className="tabs-header d-flex justify-content-between border-bottom mb-4">
-            <h3>Top thịnh hành</h3>
+        <Tabs 
+          value={tabHienTai} 
+          onChange={thayDoiTab}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ 
+            "& .MuiTab-root": { fontWeight: 600, textTransform: "none", fontSize: "1rem" }
+          }}
+        >
+          <Tab label="Tất cả" value="tat_ca" />
+          {Object.values(danhMuc).map((dm) => (
+            <Tab 
+              key={dm.ma_danh_muc} 
+              label={dm.ten_danh_muc} 
+              value={String(dm.ma_danh_muc)} 
+            />
+          ))}
+        </Tabs>
+      </Box>
 
-            <nav>
-              <div className="nav nav-tabs" role="tablist">
-                <button
-                  className={`nav-link text-uppercase fs-6 ${activeTab === "all" ? "active" : ""}`}
-                  onClick={() => changeTab("all")}
-                >
-                  All
-                </button>
+      {/* Lưới sản phẩm (Grid) */}
+      <Box
+        sx={{
+          display: "grid",
+          gap: 3,
+          gridTemplateColumns: {
+            xs: "repeat(2, 1fr)",      // 2 cột trên điện thoại
+            sm: "repeat(3, 1fr)",      // 3 cột trên tablet
+            md: "repeat(4, 1fr)",      // 4 cột trên laptop
+            lg: "repeat(5, 1fr)",      // 5 cột trên màn hình lớn
+          },
+        }}
+      >
+        {danhSachLoc.slice(0, soLuongHienThi).map((sp) => (
+          <ProductCard 
+            key={sp.ma_san_pham} 
+            sanPham={{ ...sp, quantity: 1 }} 
+            onAddToCart={() => console.log("Thêm vào giỏ:", sp)} 
+          />
+        ))}
+      </Box>
 
-                {Object.values(categories).map((dm) => (
-                  <button
-                    key={dm.ma_danh_muc}
-                    className={`nav-link text-uppercase fs-6 ${
-                      activeTab === String(dm.ma_danh_muc) ? "active" : ""
-                    }`}
-                    onClick={() => changeTab(String(dm.ma_danh_muc))}
-                  >
-                    {dm.ten_danh_muc}
-                  </button>
-                ))}
-              </div>
-            </nav>
-          </div>
-
-          {/* Danh sách sản phẩm */}
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2,
-              gridTemplateColumns: {
-                xs: "repeat(2, 1fr)",
-                sm: "repeat(3, 1fr)",
-                md: "repeat(auto-fill, minmax(220px, 1fr))",
-              },
-            }}
+      {/* Khu vực nút hành động */}
+      <Stack direction="row" justifyContent="center" mt={5} spacing={2}>
+        {coTheXemThem ? (
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => setSoLuongHienThi(prev => prev + 10)}
+            sx={{ borderRadius: 2, px: 4, py: 1, fontWeight: "bold" }}
           >
-            {renderProducts(currentProducts)}
-          </Box>
-
-          {/* Nút Xem thêm / Thu gọn */}
-          <div className="text-center mt-3">
-            {canShowMore ? (
-              <Button 
-                variant="contained" 
-                onClick={() => setVisibleCount(currentProducts.length)}
-              >
-                Xem thêm {currentProducts.length - visibleCount} sản phẩm
-              </Button>
-            ) : (
-              currentProducts.length > DEFAULT_LIMIT && (
-                <Button 
-                  variant="outlined" 
-                  onClick={() => setVisibleCount(DEFAULT_LIMIT)}
-                >
-                  Thu gọn
-                </Button>
-              )
-            )}
-          </div>
-
-        </div>
-      </div>
-    </section>
+            Xem thêm {danhSachLoc.length - soLuongHienThi} sản phẩm
+          </Button>
+        ) : (
+          danhSachLoc.length > GIOI_HAN_MAC_DINH && (
+            <Button 
+              variant="outlined" 
+              onClick={() => setSoLuongHienThi(GIOI_HAN_MAC_DINH)}
+              sx={{ borderRadius: 2, px: 4, py: 1}}
+            >
+              Thu gọn
+            </Button>
+          )
+        )}
+      </Stack>
+    </Box>
   );
 }

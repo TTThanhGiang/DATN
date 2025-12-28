@@ -1,17 +1,16 @@
 // src/layout/AdminLayout.jsx
 import React from "react";
-import Sidebar from "../components/Admin/SideBar";
+import Sidebar from "../components/Admin/Sidebar";
 import { getUser, getRole } from "../utils/auth";
- 
-// import "../assets/css/portal.css";
+
 
 export default function AdminLayout({ children }) {
   const user = getUser();
-  user.role = getRole();
+  const role = getRole();
 
   return (
     <div className="app">   
-      <Sidebar role={user.role} />
+      <Sidebar vaiTro={role} />
         
       <div className="app-wrapper">
         {children}

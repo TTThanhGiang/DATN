@@ -13,54 +13,54 @@ import { useState, useEffect } from "react";
 import api from "../../../api";
 import { getToken } from "../../../utils/auth";
 
-export default function FormDanhGia({ open, onClose, sanPham }) {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
+export default function FormDanhGia({ mo, dong, sanPham }) {
+  const [soSao, setSoSao] = useState(0);
+  const [binhLuan, setBinhLuan] = useState("");
   const token = getToken();
 
   // Hook luôn phải nằm TRÊN cùng
   useEffect(() => {
-    if (open) {
-      setRating(0);
-      setComment("");
+    if (mo) {
+      setSoSao(0);
+      setBinhLuan("");
     }
-  }, [open]);
+  }, [mo]);
 
-  const handleGuiDanhGia = async () => {
-    if (!rating) {
+  const xuLyGuiDanhGia = async () => {
+    if (!soSao) {
       alert("Vui lòng chọn số sao!");
       return;
     }
 
-    const payload = {
+    const duLieu = {
       ma_san_pham: sanPham?.ma_san_pham,
-      so_sao: rating,
-      binh_luan: comment
+      so_sao: soSao,
+      binh_luan: binhLuan
     };
 
     try {
-      const res = await api.post(`/users/gui-danh-gia`, payload, {
+      const res = await api.post(`/users/gui-danh-gia`, duLieu, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       alert(res.data.message);
-      onClose();
+      dong();
     } catch (err) {
       if (err.response && err.response.data && err.response.data.message) {
         alert(err.response.data.message);
       } else {
         alert("Lỗi kết nối server!");
-    }
+      }
     }
   };
 
   // Chỉ chặn RENDER JSX (KHÔNG return trước hooks)
-  if (!open || !sanPham) {
+  if (!mo || !sanPham) {
     return <></>; // JSX trống, KHÔNG gây lỗi hook
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={mo} onClose={dong} maxWidth="sm" fullWidth>
       <DialogTitle>Đánh giá sản phẩm</DialogTitle>
 
       <DialogContent>
@@ -77,8 +77,8 @@ export default function FormDanhGia({ open, onClose, sanPham }) {
 
         <Rating
           size="large"
-          value={rating}
-          onChange={(e, value) => setRating(value)}
+          value={soSao}
+          onChange={(e, value) => setSoSao(value)}
           sx={{ my: 2 }}
         />
 
@@ -87,14 +87,14 @@ export default function FormDanhGia({ open, onClose, sanPham }) {
           rows={3}
           fullWidth
           placeholder="Nhận xét của bạn..."
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
+          value={binhLuan}
+          onChange={(e) => setBinhLuan(e.target.value)}
         />
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Hủy</Button>
-        <Button variant="contained" color="primary" onClick={handleGuiDanhGia}>
+        <Button onClick={dong}>Hủy</Button>
+        <Button variant="contained" color="primary" onClick={xuLyGuiDanhGia}>
           Gửi đánh giá
         </Button>
       </DialogActions>

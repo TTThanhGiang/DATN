@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Box, Backdrop } from "@mui/material";
 import Header from "../components/User/Home/Header";
-import LoginOffcanvas from "../components/User/LoginOffcanvas";
+import DangNhapOffcanvas from "../components/User/Home/DangNhapOffcanvas";
 
 export default function UserLayout({ children }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -37,7 +37,7 @@ export default function UserLayout({ children }) {
       />
 
       {/* LOGIN MODAL */}
-      <LoginOffcanvas
+      <DangNhapOffcanvas
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
       />

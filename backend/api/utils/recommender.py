@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import math
 from api.routers.user import tat_ca_san_pham
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from api.models import ChiTietDonHang, SanPham, DanhGia, DonHang, LichSuXem  # Import thẳng từ project
 
 # ================== HÀM HỖ TRỢ ==================
@@ -351,83 +352,9 @@ def goi_y_pho_bien_cho_guest(db: Session, days=30, top_n=20):
 
     ket_qua.sort(key=lambda x: x["score"], reverse=True)
     return ket_qua[:top_n]
-    
-def goi_y_trending_cho_guest(db: Session, days=7, top_n=20):
-    """
-    Gợi ý sản phẩm trending cho guest:
-    - dựa trên tốc độ tăng lượt xem và lượt mua trong N ngày gần đây
-    """
-    moc = datetime.now() - timedelta(days=days)
-    thong_ke = defaultdict(lambda: {"views": 0, "purchases": 0})
-
-    # Views gần đây
-    for ls in db.query(LichSuXem).filter(LichSuXem.thoi_gian >= moc).all():
-        thong_ke[ls.ma_san_pham]["views"] += 1
-
-    # Mua gần đây
-    don_hang_moi = db.query(DonHang).filter(DonHang.ngay_dat >= moc).all()
-    for dh in don_hang_moi:
-        for ct in dh.chi_tiet_don_hangs:
-            thong_ke[ct.ma_san_pham]["purchases"] += 1
-
-    # Tính score trending
-    ket_qua = []
-    for pid, st in thong_ke.items():
-        sp = db.query(SanPham).filter(SanPham.ma_san_pham == pid).first()
-        if sp:
-            diem = st["views"]*0.2 + st["purchases"]*1.5  # trọng số views < purchases
-            ket_qua.append({"san_pham": sp, "score": diem})
-
-    ket_qua.sort(key=lambda x: x["score"], reverse=True)
-    return ket_qua[:top_n]
-
-def goi_y_trending_theo_danh_muc(db: Session, days=7, top_n=20, top_dm=3):
-    """
-    Gợi ý sản phẩm trending theo các danh mục phổ biến:
-    - days: khoảng thời gian tính trending
-    - top_dm: số danh mục phổ biến nhất được xét
-    """
-    moc = datetime.now() - timedelta(days=days)
-    # Thống kê lượt xem và lượt mua gần đây
-    dm_stats = defaultdict(int)  # ma_danh_muc -> lượt xem+mua
-    sp_stats = defaultdict(lambda: {"views":0, "purchases":0})
-    
-    # Views
-    for ls in db.query(LichSuXem).filter(LichSuXem.thoi_gian >= moc).all():
-        sp = db.query(SanPham).get(ls.ma_san_pham)
-        if not sp:
-            continue
-        dm_stats[sp.ma_danh_muc] += 1
-        sp_stats[sp.ma_san_pham]["views"] += 1
-    
-    # Purchases
-    don_hang_moi = db.query(DonHang).filter(DonHang.ngay_dat >= moc).all()
-    for dh in don_hang_moi:
-        for ct in dh.chi_tiet_don_hangs:
-            sp = db.query(SanPham).get(ct.ma_san_pham)
-            if not sp:
-                continue
-            dm_stats[sp.ma_danh_muc] += 1
-            sp_stats[sp.ma_san_pham]["purchases"] += 1
-
-    # Lấy top danh mục
-    top_dm_ids = sorted(dm_stats, key=lambda k: dm_stats[k], reverse=True)[:top_dm]
-
-    # Chọn sản phẩm trending trong các danh mục hot
-    ket_qua = []
-    for pid, st in sp_stats.items():
-        sp = db.query(SanPham).get(pid)
-        if sp.ma_danh_muc not in top_dm_ids:
-            continue
-        score = st["views"]*0.2 + st["purchases"]*1.5
-        ket_qua.append({"san_pham": sp, "score": score, "ma_danh_muc": sp.ma_danh_muc})
-
-    # Sắp xếp theo điểm
-    ket_qua.sort(key=lambda x: x["score"], reverse=True)
-    return ket_qua[:top_n]
 
 
-def get_trending_by_category(db: Session, days: int = 7, top_dm: int = 5, top_sp: int = 10):
+def get_trending_by_category(db: Session, days: int = 30, top_dm: int = 5, top_sp: int = 10):
     """
     Trả về:
     {
@@ -484,5 +411,77 @@ def get_trending_by_category(db: Session, days: int = 7, top_dm: int = 5, top_sp
         result[dm_id] = sorted(result[dm_id], key=lambda x: x["score"], reverse=True)[:top_sp]
 
     return result
+
+
+def lay_top_san_pham_tot_nhat_theo_danh_muc(
+    db: Session,
+    ma_danh_muc: int,
+    so_luong: int = 10,
+    diem_danh_gia_toi_thieu: float = 3.5
+):
+    """
+    Lấy TOP sản phẩm tốt nhất theo danh mục
+
+    Tiêu chí:
+    - Ưu tiên số lượng bán
+    - Kết hợp điểm đánh giá trung bình
+
+    Return:
+    [
+        {
+            "san_pham": SanPham,
+            "diem_trung_binh": float,
+            "tong_da_ban": int,
+            "diem_xep_hang": float,
+            "phuong_phap": "top_theo_danh_muc"
+        }
+    ]
+    """
+
+    # ===================== LẤY SẢN PHẨM TRONG DANH MỤC =====================
+    danh_sach_san_pham = (
+        db.query(SanPham)
+        .filter(SanPham.ma_danh_muc == ma_danh_muc)
+        .all()
+    )
+
+    ket_qua = []
+
+    for san_pham in danh_sach_san_pham:
+
+        # ===================== TỔNG ĐÃ BÁN =====================
+        tong_da_ban = (
+            db.query(func.sum(ChiTietDonHang.so_luong))
+            .filter(ChiTietDonHang.ma_san_pham == san_pham.ma_san_pham)
+            .scalar()
+        ) or 0
+
+        # ===================== ĐIỂM ĐÁNH GIÁ TRUNG BÌNH =====================
+        diem_trung_binh = (
+            db.query(func.avg(DanhGia.sao))
+            .filter(DanhGia.ma_san_pham == san_pham.ma_san_pham)
+            .scalar()
+        )
+
+        diem_trung_binh = float(diem_trung_binh) if diem_trung_binh else 3.5
+
+        diem_xep_hang = tong_da_ban * 1.2 + diem_trung_binh * 2
+
+        ket_qua.append({
+            "san_pham": san_pham,
+            "diem_trung_binh": diem_trung_binh,
+            "tong_da_ban": tong_da_ban,
+            "diem_xep_hang": diem_xep_hang,
+            "phuong_phap": "top_theo_danh_muc"
+        })
+
+    # ===================== SẮP XẾP =====================
+    ket_qua = sorted(
+        ket_qua,
+        key=lambda x: x["diem_xep_hang"],
+        reverse=True
+    )
+
+    return ket_qua[:so_luong]
 
 

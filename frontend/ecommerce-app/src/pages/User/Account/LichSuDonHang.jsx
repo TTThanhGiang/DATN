@@ -81,9 +81,9 @@ export default function LichSuDonHang() {
       )}
 
       <FormDanhGia
-        open={moDanhGia}
+        mo={moDanhGia}
         sanPham={sanPhamDangDanhGia}
-        onClose={() => setMoDanhGia(false)}
+        dong={() => setMoDanhGia(false)}
         fullScreen={isMobile}  
       />
     </Box>

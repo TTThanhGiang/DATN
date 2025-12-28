@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 
 // Admin components
 import AdminLayout from "./layout/AdminLayout";
-import Dashboard from "./pages/Admin/Dashboard";
+import TongQuan from "./pages/Admin/TongQuan";
 import QuanLyTaiKhoan from "./pages/Admin/QuanLyTaiKhoan";
 import QuanLyChiNhanh from "./pages/Admin/QuanLyChiNhanh";
 import QuanLyDanhMuc from "./pages/Admin/QuanLyDanhMuc";
@@ -18,21 +18,25 @@ import AdminQuanLyKhuyenMai from "./pages/Admin/QuanLyKhuyenMai";
 // User page
 import UserLayout from "./layout/UserLayout";
 import HomePage from "./pages/User/Home/Home";
-import ProductDetail from "./pages/User/Products/ProductDetail";
-import Cart from "./pages/User/Checkout/Cart";
-import ProductListPage from "./pages/User/Products/Products";
+import ChiTietSanPham from "./pages/User/Products/ChiTietSanPham";
+import GioHang from "./pages/User/Checkout/GioHang";
+import DanhSachSanPham from "./pages/User/Products/DanhSachSanPham";
 import LichSuDonHang  from "./pages/User/Account/LichSuDonHang";
+import ChiTietKhuyenMai from "./pages/User/Products/SanPhamKhuyenMai";
 
-// Manage pages
-import QuanLyNhanVien from "./pages/BranchManager/EmployeeManage";
-import QuanLyKhuyenMai from "./pages/BranchManager/PromotionManage";
-import QuanLyDonHang from "./pages/BranchManager/OrderManage";
+// Admin pages
+import QuanLyNhanVien from "./pages/BranchManager/QuanLyNhanVien";
+import QuanLyKhuyenMai from "./pages/BranchManager/QuanLyKhuyenMai";
+import QuanLyDonHang from "./pages/BranchManager/QuanLyDonHang";
 import QuanLyTonKho from "./pages/BranchManager/QuanLyTonKho";
 import QuanLyYeuCauNhapHang from "./pages/BranchManager/YeuCauNhapHang";
+import TongQuanQuanLy from "./pages/BranchManager/TongQuan";
+import QuanLyDonHangAdmin from "./pages/Admin/QuanLyDonHang";
 
 // Manage staff
-import OrderManageStaff from "./pages/Staff/OrderManage";
-import Profile from "./pages/Staff/Profile";
+import QuanLyDonHangStaff from "./pages/Staff/QuanLyDonHang";
+import ThongTinCaNhanStaff from "./pages/Staff/ThongTinCaNhan";
+import TongQuanStaff from "./pages/Staff/TongQuan";
 
 // Auth/Protected
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -40,9 +44,6 @@ import TaiKhoanNguoiDungLayOut from "./layout/TaiKhoaNguoiDungLayout";
 import ThongTinCaNhan from "./pages/User/Account/ThongTinCaNhan";
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const sidebarWidth = sidebarOpen ? 240 : 0;
-
   return (
     <Router>
       <Routes>
@@ -53,10 +54,11 @@ function App() {
             <UserLayout>
               <Routes>
                 <Route path="/" element={<HomePage />} />
-                <Route path="/san-pham/:id" element={<ProductDetail />} />
-                <Route path="/gio-hang" element={<Cart />} />
-                <Route path="/danh-muc/:id" element={<ProductListPage />} />
-                <Route path="/danh-muc/:id/:subId?" element={<ProductListPage />} />
+                <Route path="/san-pham/:ma_san_pham" element={<ChiTietSanPham />} />
+                <Route path="/gio-hang" element={<GioHang />} />
+                <Route path="/danh-muc/:id" element={<DanhSachSanPham />} />
+                <Route path="/danh-muc/:id/:subId?" element={<DanhSachSanPham />} />
+                <Route path="/khuyen-mai/:id" element={<ChiTietKhuyenMai />} />
                 {/* ===========================
                 KHU VỰC QUẢN LÝ TÀI KHOẢN
               ============================ */}
@@ -64,11 +66,6 @@ function App() {
                   <Route index element={<ThongTinCaNhan />} />
                   <Route path="thong-tin" element={<ThongTinCaNhan />} />
                   <Route path="lich-su-mua-hang" element={<LichSuDonHang />} />
-                  {/*
-                  <Route path="doi-mat-khau" element={<DoiMatKhau />} />
-                  <Route path="dia-chi" element={<DiaChi />} /> */}
-
-                  {/* Mặc định khi truy cập /tai-khoan */}
 
                 </Route>
               </Routes>
@@ -83,10 +80,11 @@ function App() {
             <ProtectedRoute role="admin">
               <AdminLayout>
                 <Routes>
-                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="dashboard" element={<TongQuan />} />
                   <Route path="tai-khoans" element={<QuanLyTaiKhoan />} />
                   <Route path="chi-nhanhs" element={<QuanLyChiNhanh />} />
                   <Route path="danh-mucs" element={<QuanLyDanhMuc />} />
+                  <Route path="don-hangs" element={<QuanLyDonHangAdmin />} />
                   <Route path="san-phams" element={<QuanLySanPham />} />
                   <Route path="ton-khos" element={<AdminQuanLyTonKho />} />
                   <Route path="danh-gias" element={<QuanLyDanhGia/>}/>
@@ -105,7 +103,7 @@ function App() {
             <ProtectedRoute role="manager">
               <AdminLayout>
                 <Routes>
-                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="dashboard" element={<TongQuanQuanLy />} />
                   <Route path="nhan-viens" element={<QuanLyNhanVien />} />
                   <Route path="ton-khos" element={<QuanLyTonKho />} />
                   <Route path="khuyen-mais" element={<QuanLyKhuyenMai />} />
@@ -124,9 +122,9 @@ function App() {
             <ProtectedRoute role="staff">
               <AdminLayout>
                 <Routes>
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="orders" element={<OrderManageStaff />} />
-                  <Route path="profile" element={<Profile />} />
+                  <Route path="dashboard" element={<TongQuanStaff />} />
+                  <Route path="orders" element={<QuanLyDonHangStaff />} />
+                  <Route path="profile" element={<ThongTinCaNhanStaff />} />
                 </Routes>
               </AdminLayout>
             </ProtectedRoute>

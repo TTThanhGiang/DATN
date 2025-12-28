@@ -11,75 +11,136 @@ import {
   TableRow,
   Paper,
   Stack,
-  IconButton,
   Pagination,
+  IconButton,
+  OutlinedInput,
+  Grid,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
-import { EditOutlined, DeleteOutlined } from "@mui/icons-material";
+import { EditOutlined, DeleteOutlined, Search } from "@mui/icons-material";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 import PageWrapper from "../../components/PageWrapper";
-import ProductForm from "../../components/Admin/ProductForm";
+import FormSanPham from "../../components/Admin/FormSanPham";
+import CategorySelectorModal from "../../components/Admin/ModalChonDanhMuc";
+
 import api from "../../api";
 import { getToken } from "../../utils/auth";
 
-export default function ProductManage() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [editProduct, setEditProduct] = useState(null);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+export default function QuanLySanPham() {
+  const [tabHienTai, setTabHienTai] = useState(0);
+  const [danhSachSanPham, setDanhSachSanPham] = useState([]);
+  const [danhSachDanhMuc, setDanhSachDanhMuc] = useState([]);
+  const [sanPhamSua, setSanPhamSua] = useState(null);
+  const [trang, setTrang] = useState(1);
+  const [tongSo, setTongSo] = useState(0);
+
+  const [chonDanhMuc, setChonDanhMuc] = useState(null);
+  const [modalDanhMucMo, setModalDanhMucMo] = useState(false);
+
+  const [tuKhoaSanPham, setTuKhoaSanPham] = useState(null);
 
   const limit = 10;
   const token = getToken();
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, [page]);
+    layDanhSachDanhMuc();
+  }, []);
 
-  const fetchProducts = async () => {
+  useEffect(() => {
+    layDanhSachSanPham();
+  }, [trang, chonDanhMuc]);
+  
+  useEffect(() => {
+    setTrang(1);
+  }, [tuKhoaSanPham, chonDanhMuc]);
+
+  const xuLyTimKiem = () => {
+    setTrang(1);         
+    layDanhSachSanPham(); 
+  };
+
+  const layDanhSachSanPham = async () => {
     try {
-      const offset = (page - 1) * limit;
-      const res = await api.get(`/admins/danh-sach-san-pham?limit=${limit}&offset=${offset}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const offset = (trang - 1) * limit;
+
+      const res = await api.get("/admins/danh-sach-san-pham", {
+        params: {
+          limit,
+          offset,
+          ten_san_pham: tuKhoaSanPham || undefined,
+          ma_danh_muc: chonDanhMuc?.ma_danh_muc || undefined,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
       if (res.data.success) {
-        setProducts(res.data.data.items);
-        setTotal(res.data.data.total);
+        setDanhSachSanPham(res.data.data.items);
+        setTongSo(res.data.data.total);
       }
     } catch (err) {
       console.error("Lỗi lấy danh sách sản phẩm:", err);
     }
   };
 
-  const fetchCategories = async () => {
+  const layDanhSachDanhMuc = async () => {
     try {
       const res = await api.get("/users/danh-muc");
-      if (res.data.success) setCategories(res.data.data);
+      if (res.data.success){
+        const danhMuc = layDanhMucLa(res.data.data)
+        const danhSachCoTatCa = [
+          {
+            ma_danh_muc: null,
+            ten_danh_muc: "Tất cả danh mục",
+          },
+          ...danhMuc,
+        ];
+        setDanhSachDanhMuc(danhSachCoTatCa);
+      }
+        
     } catch (err) {
       console.error("Lỗi lấy danh mục:", err);
     }
   };
-  
-  const handleTabChange = (_, value) => {
-    setActiveTab(value);
-    setEditProduct(null);
+
+  const layDanhMucLa = (danhMuc) => {
+    let ketQua = [];
+
+    for (const dm of danhMuc) {
+      if (!dm.danh_muc_con || dm.danh_muc_con.length === 0) {
+        ketQua.push(dm);
+      }
+
+      if (dm.danh_muc_con && dm.danh_muc_con.length > 0) {
+        ketQua = ketQua.concat(layDanhMucLa(dm.danh_muc_con));
+      }
+    }
+
+    return ketQua;
   };
 
-  const handleEditClick = (product) => {
-    setEditProduct(product);
-    setActiveTab(1); // chuyển sang tab chỉnh sửa
+  const xuLyChuyenTab = (_, giaTri) => {
+    setTabHienTai(giaTri);
+    setSanPhamSua(null);
   };
 
-  const handleDelete = async (product) => {
+  const xuLyChinhSuaClick = (sp) => {
+    setSanPhamSua(sp);
+    setTabHienTai(1); // chuyển sang tab sửa
+  };
+
+  const xuLyXoaSanPham = async (sp) => {
     if (!window.confirm("Bạn có chắc muốn xóa sản phẩm này?")) return;
     try {
-      const res = await api.delete(`/admins/xoa-san-pham/${product.ma_san_pham}`, {
+      const res = await api.delete(`/admins/xoa-san-pham/${sp.ma_san_pham}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.success) {
         alert("Xóa sản phẩm thành công!");
-        fetchProducts();
+        layDanhSachSanPham();
       } else {
         alert("Xóa thất bại: " + res.data.message);
       }
@@ -93,14 +154,59 @@ export default function ProductManage() {
     <PageWrapper title="Quản lý sản phẩm">
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
+        <Tabs value={tabHienTai} onChange={xuLyChuyenTab}>
           <Tab label="Danh sách sản phẩm" />
-          <Tab label={editProduct ? "Cập nhật sản phẩm" : "Thêm sản phẩm"} />
+          <Tab label={sanPhamSua ? "Cập nhật sản phẩm" : "Thêm sản phẩm"} />
         </Tabs>
       </Box>
 
-      {/* Tab danh sách */}
-      {activeTab === 0 && (
+      {/* Tab danh sách sản phẩm */}
+      {tabHienTai === 0 && (
+        <Box>
+          <Paper elevation={0} sx={{  mb: 1, borderRadius: 3,}}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid size={{ xs: 12, md: 7 }}>
+                <TextField 
+                  fullWidth
+                  label="Tìm sản phẩm" 
+                  placeholder="Nhập tên sản phẩm..."
+                  value={tuKhoaSanPham}
+                  onChange={(e) => setTuKhoaSanPham(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      xuLyTimKiem();
+                    }
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={xuLyTimKiem}>
+                          <Search />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ bgcolor: 'white' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 5 }}>
+                <Stack sx={{ gap: 1 }}>
+                  <OutlinedInput
+                    value={chonDanhMuc ? chonDanhMuc.ten_danh_muc : ""}
+                    placeholder="Chọn danh mục..."
+                    readOnly
+                    fullWidth
+                    endAdornment={
+                      <IconButton onClick={() => setModalDanhMucMo(true)}>
+                        <ArrowDropDownIcon />
+                      </IconButton>
+                    }
+                    onClick={() => setModalDanhMucMo(true)}
+                  />
+                </Stack>
+              </Grid>
+            </Grid>
+          </Paper>
         <TableContainer component={Paper} sx={{ borderRadius: 2, border: "1px solid #eee" }}>
           <Table>
             <TableHead>
@@ -115,26 +221,26 @@ export default function ProductManage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {products.map((product) => (
-                <TableRow key={product.ma_san_pham} hover>
+              {danhSachSanPham.map((sp) => (
+                <TableRow key={sp.ma_san_pham} hover>
                   <TableCell>
                     <img
-                      src={product.hinh_anhs?.[0]?.duong_dan || ""}
-                      alt={product.ten_san_pham}
+                      src={sp.hinh_anhs?.[0]?.duong_dan || ""}
+                      alt={sp.ten_san_pham}
                       style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 4 }}
                     />
                   </TableCell>
-                  <TableCell>{product.ten_san_pham}</TableCell>
-                  <TableCell>{product.ten_danh_muc}</TableCell>
-                  <TableCell>{product.don_gia}</TableCell>
-                  <TableCell>{product.giam_gia}</TableCell>
-                  <TableCell>{product.don_vi}</TableCell>
+                  <TableCell>{sp.ten_san_pham}</TableCell>
+                  <TableCell>{sp.ten_danh_muc}</TableCell>
+                  <TableCell>{sp.don_gia}</TableCell>
+                  <TableCell>{sp.giam_gia}</TableCell>
+                  <TableCell>{sp.don_vi}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <IconButton color="primary" onClick={() => handleEditClick(product)}>
+                      <IconButton color="primary" onClick={() => xuLyChinhSuaClick(sp)}>
                         <EditOutlined />
                       </IconButton>
-                      <IconButton color="error" onClick={() => handleDelete(product)}>
+                      <IconButton color="error" onClick={() => xuLyXoaSanPham(sp)}>
                         <DeleteOutlined />
                       </IconButton>
                     </Stack>
@@ -146,28 +252,36 @@ export default function ProductManage() {
 
           <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
             <Pagination
-              count={Math.ceil(total / limit)}
-              page={page}
-              onChange={(_, value) => setPage(value)}
+              count={Math.ceil(tongSo / limit)}
+              page={trang}
+              onChange={(_, value) => setTrang(value)}
               color="primary"
               shape="rounded"
             />
           </Stack>
         </TableContainer>
+        </Box>
       )}
 
-      {/* Tab Thêm / Sửa */}
-      {activeTab === 1 && (
-        <ProductForm
-          categories={categories}
-          editProduct={editProduct}
-          onSuccess={() => {
-            setActiveTab(0);
-            setEditProduct(null);
-            fetchProducts();
+      {/* Tab Thêm / Sửa sản phẩm */}
+      {tabHienTai === 1 && (
+        <FormSanPham
+          danhSachDanhMuc={danhSachDanhMuc}
+          sanPhamSua={sanPhamSua}
+          khiThanhCong={() => {
+            setTabHienTai(0);
+            setSanPhamSua(null);
+            layDanhSachSanPham();
           }}
         />
       )}
+
+      <CategorySelectorModal
+        mo={modalDanhMucMo}
+        dong={() => setModalDanhMucMo(false)}
+        danhSachDanhMuc={danhSachDanhMuc}
+        khiChon={(cat) => setChonDanhMuc(cat)}
+      />
     </PageWrapper>
   );
 }

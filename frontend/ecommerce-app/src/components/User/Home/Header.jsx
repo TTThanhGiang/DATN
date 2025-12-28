@@ -1,60 +1,65 @@
 import { useState, useEffect } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate } from "react-router-dom";
-import SearchOffcanvas from "./SearchOffcanvas";
-import AuthOffcanvas  from "../LoginOffcanvas";
-import DiaChiDialog  from "../Home/DiaChiDialog";
+import ThanhCongCuTimKiem from "./TimKiemOffcanvas";
+import DangNhapOffcanvas  from "./DangNhapOffcanvas";
+import DialogDiaChi  from "../Home/DiaChiDialog";
 import { getToken, getRole, logout, getUserId, getUser } from "../../../utils/auth";
-
 
 import {IconButton, Badge, Menu, MenuItem, Box} from '@mui/material';
 import { ShoppingCart, AccountCircle, Favorite, Search, LocationOn, Inventory2, Logout } from '@mui/icons-material';
 import api from "../../../api";
 
 function Header() {
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [cartItems, setCartItems] = useState([]);
+  // State
+  const [gioHangMo, setGioHangMo] = useState(false);
+  const [timKiemMo, setTimKiemMo] = useState(false);
+  const [dangNhapMo, setDangNhapMo] = useState(false);
+  const [sanPhamGioHang, setSanPhamGioHang] = useState([]);
 
   const [moDiaChi, setMoDiaChi] = useState(false);
-  const [diaChi, setDiaChi] = useState("");
+  const [diaChiHienTai, setDiaChiHienTai] = useState("");
 
-  const [anchorEl, setAnchorEl] = useState(null);
-  const isMenuOpen = Boolean(anchorEl);
-  const userId = getUserId();
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const menuMo = Boolean(menuAnchor);
+
+  const idNguoiDung = getUserId();
   const token = getToken();
 
-  const navigate = useNavigate();
+  const dieuHuong = useNavigate();
 
-  const handleMenuOpen = (event) => {
+  // Hàm mở menu
+  const moMenuNguoiDung = (event) => {
     if(token){
-      setAnchorEl(event.currentTarget);
+      setMenuAnchor(event.currentTarget);
     } else {
-      setIsAuthOpen(true);
+      setDangNhapMo(true);
     }
-  }
+  };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  }
+  // Hàm đóng menu
+  const dongMenuNguoiDung = () => {
+    setMenuAnchor(null);
+  };
 
-  const handleLogout = () => {
+  // Đăng xuất
+  const xoaDangNhap = () => {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
       logout();
-      setAnchorEl(null);
+      setMenuAnchor(null);
       window.dispatchEvent(new Event("user-logout"));
-      navigate("/");
+      dieuHuong("/");
    }
   };
 
+  // Lấy số sản phẩm trong giỏ hàng
   useEffect(() => {
     if (token) {
-      getSoSPGioHang();
+      laySoSanPhamGioHang();
     }
 
     const capNhatGioHang = () => {
-      if (token) getSoSPGioHang();
+      if (token) laySoSanPhamGioHang();
     };
 
     window.addEventListener("cart-updated", capNhatGioHang);
@@ -64,21 +69,21 @@ function Header() {
     };
   }, [token]);
 
-  const getSoSPGioHang = async () => {
+  const laySoSanPhamGioHang = async () => {
     try {
       const res = await api.get(`/users/so-san-pham-trong-gio-hang`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      setCartItems(res.data.data);
+      setSanPhamGioHang(res.data.data);
     } catch (error) {
       console.error("Lỗi lấy số SP giỏ hàng:", error);
     }
   };
+
   return (
-    <header className="header"
-    >
+    <header className="header">
       <div className="container-fluid">
         <div className="row py-3 border-bottom">
           {/* Logo */}
@@ -94,13 +99,13 @@ function Header() {
           <div className="col-sm-6 offset-sm-2 offset-md-0 col-lg-5 d-none d-lg-block">
             <div className="search-bar row bg-light p-2 my-2 rounded-4">
               <div className="col-11 col-md-11">
-                <form id="search-form" className="text-center" action="index.html" method="post">
+                <form id="form-tim-kiem" className="text-center" action="index.html" method="post">
                   <input type="text" className="form-control border-0 bg-transparent" placeholder="Tìm kiếm sản phẩm..." />
                 </form>
               </div>
               <div className="col-1">
-                <IconButton color="inherit" onClick={() => navigate("/gio-hang")}>
-                  <Badge badgeContent={cartItems} color="primary">
+                <IconButton color="inherit" onClick={() => dieuHuong("/gio-hang")}>
+                  <Badge badgeContent={sanPhamGioHang} color="primary">
                     <ShoppingCart />
                   </Badge>
               </IconButton>
@@ -142,13 +147,13 @@ function Header() {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {diaChi}
+                    {diaChiHienTai}
                   </span>
                 </div>
 
                 {/* TÀI KHOẢN */}
                 <button
-                  onClick={handleMenuOpen}
+                  onClick={moMenuNguoiDung}
                   style={{
                     background: "#006133",
                     color: "#fff",
@@ -171,38 +176,37 @@ function Header() {
 
             {/* ===== MOBILE ===== */}
             <div className="d-lg-none">
-              {/* HÀNG ICON */}
               <Box
                 sx={{
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
                   justifyContent: {
-                    xs: "center",   // mobile
-                    sm: "flex-end", // tablet trở lên
+                    xs: "center",
+                    sm: "flex-end",
                   },
                 }}
               >
-                <IconButton onClick={() => setIsSearchOpen(true)}>
+                <IconButton onClick={() => setTimKiemMo(true)}>
                   <Search />
                 </IconButton>
 
-                <IconButton onClick={() => navigate("/gio-hang")}>
+                <IconButton onClick={() => dieuHuong("/gio-hang")}>
                   <Badge badgeContent={3} color="primary">
                     <ShoppingCart />
                   </Badge>
                 </IconButton>
 
-                <IconButton onClick={handleMenuOpen}>
+                <IconButton onClick={moMenuNguoiDung}>
                   <AccountCircle />
                 </IconButton>
               </Box>
             </div>
 
             <Menu
-              anchorEl={anchorEl}
-              open={isMenuOpen}
-              onClose={handleMenuClose}
+              anchorEl={menuAnchor}
+              open={menuMo}
+              onClose={dongMenuNguoiDung}
               anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
               transformOrigin={{ vertical: "top", horizontal: "right" }}
               PaperProps={{
@@ -216,8 +220,8 @@ function Header() {
             >
               <MenuItem
                 onClick={() => {
-                  handleMenuClose();
-                  navigate("/tai-khoan");
+                  dongMenuNguoiDung();
+                  dieuHuong("/tai-khoan");
                 }}
                 sx={{ gap: 1.5 }}
               >
@@ -227,8 +231,8 @@ function Header() {
 
               <MenuItem
                 onClick={() => {
-                  handleMenuClose();
-                  navigate("/tai-khoan/lich-su-mua-hang");
+                  dongMenuNguoiDung();
+                  dieuHuong("/tai-khoan/lich-su-mua-hang");
                 }}
                 sx={{ gap: 1.5 }}
               >
@@ -237,7 +241,7 @@ function Header() {
               </MenuItem>
 
               <MenuItem
-                onClick={handleLogout}
+                onClick={xoaDangNhap}
                 sx={{
                   gap: 1.5,
                   color: "error.main",
@@ -248,22 +252,21 @@ function Header() {
               </MenuItem>
             </Menu>
           </div>
-
           
         </div>
       </div>
 
       {/* Search Offcanvas (mobile) */}
-      <SearchOffcanvas isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <ThanhCongCuTimKiem mo={timKiemMo} dong={() => setTimKiemMo(false)} />
       
       {/* Login Offcanvas (mobile & desktop) */}
-      <AuthOffcanvas isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <DangNhapOffcanvas mo={dangNhapMo} dong={() => setDangNhapMo(false)} />
 
-        <DiaChiDialog
-          mo={moDiaChi}
-          dong={() => setMoDiaChi(false)}
-          onXacNhan={(diaChiDayDu) => setDiaChi(diaChiDayDu)}
-        />
+      <DialogDiaChi
+        mo={moDiaChi}
+        dong={() => setMoDiaChi(false)}
+        onXacNhan={(diaChiDayDu) => setDiaChiHienTai(diaChiDayDu)}
+      />
     </header>
   );
 }

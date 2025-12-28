@@ -15,15 +15,18 @@ import {
   IconButton,
   Stack,
   Pagination,
+  Grid,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
-import { EditOutlined, DeleteOutlined } from "@mui/icons-material";
+import { EditOutlined, DeleteOutlined, Search } from "@mui/icons-material";
 import AddCircleOutline from "@mui/icons-material/AddCircleOutline";
 import api from "../../api";
 import { getToken } from "../../utils/auth";
-import CategoryForm from "../../components/Admin/CategoryForm";
+import FormDanhMuc from "../../components/Admin/FormDanhMuc";
 
 
-export default function CategoryManage() {
+export default function QuanLyDanhMuc() {
   const [tatCaDanhMuc, setTatCaDanhMuc] = useState([]);
 
   const [tabDangChon, setTabDangChon] = useState(0);
@@ -32,6 +35,8 @@ export default function CategoryManage() {
 
   const [trangHienTai, setTrangHienTai] = useState(1);
   const [tongSoLuong, setTongSoLuong] = useState(0);
+
+  const [tuKhoaDanhMuc, setTuKhoaDanhMuc] = useState("");
 
   const gioiHan = 10;
   const token = getToken();
@@ -47,14 +52,27 @@ export default function CategoryManage() {
   };
 
   useEffect(() => {
-    fetchCategories();
-    fetchCategoriesFull();
-  },[trangHienTai]);
+    layTatCaDanhMuc();
+  },[]);
 
-  const fetchCategories = async() => {
+  useEffect(() => {
+    layDanhSachDanhMuc();
+  }, [trangHienTai]);
+
+  useEffect(() => {
+    setTrangHienTai(1);
+  }, [tuKhoaDanhMuc]);
+  
+
+  const layDanhSachDanhMuc = async() => {
     try{
       const offset = (trangHienTai-1)* gioiHan;
-      const res = await api.get(`admins/danh-muc?limit=${gioiHan}&offset=${offset}`, {
+      const res = await api.get(`admins/danh-muc`, {
+        params: {
+          limit: gioiHan,
+          offset,
+          ten_danh_muc: tuKhoaDanhMuc || undefined,
+        },
         headers:{ Authorization: `Bearer ${token}` },
       })
       if(res.data.success){
@@ -65,7 +83,7 @@ export default function CategoryManage() {
       console.error("Lỗi lấy danh mục:", err);
     }
   }
-  const fetchCategoriesFull = async () => {
+  const layTatCaDanhMuc = async () => {
     try {
       const res = await api.get("/users/danh-muc");
       if (res.data.success) setTatCaDanhMuc(res.data.data);
@@ -73,6 +91,22 @@ export default function CategoryManage() {
       console.error("Lỗi lấy danh mục:", err);
     }
   };
+
+  const xoaDanhMuc = async (dm) => {
+    try{
+      const res = await api.delete(`/admins/xoa-danh-muc/${dm.ma_danh_muc}`,{
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      if(res.data.success){
+        alert("Xóa danh mục thành công!");
+        layDanhSachDanhMuc();
+      }
+    }catch(err){  
+        console.log("Lỗi khi xóa danh mục", err);
+    }
+  }
 
 
   return (
@@ -87,7 +121,39 @@ export default function CategoryManage() {
 
       {/* --- TAB 1: DANH SÁCH --- */}
       {tabDangChon === 0 && (
-        <Box sx={{ overflowX: "auto", mt: 2 }}>
+        <Box>
+          <Paper elevation={0} sx={{  mb: 1, borderRadius: 3,}}>
+            <Grid container spacing={2} >
+              <Grid size={{ xs: 12, md: 8 }}>
+                <TextField 
+                  fullWidth
+                  label="Tìm danh mục" 
+                  placeholder="Nhập tên danh mục..."
+                  value={tuKhoaDanhMuc}
+                  onChange={(e) => setTuKhoaDanhMuc(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setTrangHienTai(1);
+                      layDanhSachDanhMuc();
+                    }
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={(e) => {
+                          setTrangHienTai(1);
+                          layDanhSachDanhMuc();
+                        }}>
+                          <Search />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ bgcolor: 'white' }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
           <TableContainer
             component={Paper}
             sx={{
@@ -127,7 +193,9 @@ export default function CategoryManage() {
                         >
                           <EditOutlined />
                         </IconButton>
-                        <IconButton color="error" size="small">
+                        <IconButton color="error" size="small"
+                          onClick={() => xoaDanhMuc(c)}  
+                        >
                           <DeleteOutlined />
                         </IconButton>
                       </Stack>
@@ -151,13 +219,13 @@ export default function CategoryManage() {
 
       {/* Tab Thêm / Sửa */}
             {tabDangChon === 1 && (
-              <CategoryForm
-                categories={tatCaDanhMuc}
-                editCategory={danhMucDangSua} 
-                onSuccess={() => {
+              <FormDanhMuc
+                danhSachDanhMuc={tatCaDanhMuc}
+                danhMucChinhSua={danhMucDangSua} 
+                khiThanhCong={() => {
                   setTabDangChon(0);
                   setDanhMucDangSua(null);
-                  fetchCategories();
+                  layDanhSachDanhMuc();
                 }}
               />
             )}

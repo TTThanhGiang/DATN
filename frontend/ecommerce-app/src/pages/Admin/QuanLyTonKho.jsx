@@ -23,143 +23,156 @@ import {
     ListItemText,
     Divider,
     Button,
-    Pagination 
+    Pagination, 
+    Grid,
+    InputAdornment
 } from '@mui/material';
 
 import SearchIcon from "@mui/icons-material/Search";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { EditOutlined, DeleteOutlined, AddCircleOutline } from "@mui/icons-material";
+import { EditOutlined, DeleteOutlined, AddCircleOutline, Search } from "@mui/icons-material";
 
 import PageWrapper from '../../components/PageWrapper';
 import api from "../../api";
 import { getToken } from "../../utils/auth";
 
-export default function InventoryManage() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [branches, setBranches] = useState([]);
-  const [productList, setProductList] = useState([]);
-  const [inventoryList, setInventoryList] = useState([]);
-  const [quantity, setQuantity] = useState("");
-  const [productQuantities, setProductQuantities] = useState({});
+export default function QuanLyTonKho() {
+  const [tabDangChon, setTabDangChon] = useState(0);
 
-  const [editInventory, setEditInventory] = useState(null);
-  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [danhSachChiNhanh, setDanhSachChiNhanh] = useState([]);
+  const [danhSachSanPham, setDanhSachSanPham] = useState([]);
+  const [danhSachTonKho, setDanhSachTonKho] = useState([]);
 
-  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [chiNhanhDangChon, setChiNhanhDangChon] = useState(null);
+  const [tonKhoDangSua, setTonKhoDangSua] = useState(null);
 
-  const [openBranch, setOpenBranch] = useState(false);
-  const [openProduct, setOpenProduct] = useState(false);
-  const [searchBranch, setSearchBranch] = useState("");
-  const [searchProduct, setSearchProduct] = useState("");
+  const [sanPhamDaChon, setSanPhamDaChon] = useState([]);
+  const [soLuongTheoSanPham, setSoLuongTheoSanPham] = useState({});
+  const [soLuong, setSoLuong] = useState("");
 
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [moDialogChiNhanh, setMoDialogChiNhanh] = useState(false);
+  const [moDialogSanPham, setMoDialogSanPham] = useState(false);
+
+  const [timChiNhanh, setTimChiNhanh] = useState("");
+  const [timSanPham, setTimSanPham] = useState("");
+
+  const [trang, setTrang] = useState(1);
+  const [tongSo, setTongSo] = useState(0);
 
   const token = getToken();
-  const limit = 10;
+  const gioiHan = 10;
 
-  const filteredBranches = branches.filter(
+  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState("");
+
+
+  const chiNhanhLoc  = danhSachChiNhanh.filter(
     (b) =>
-      b.ten_chi_nhanh.toLowerCase().includes(searchBranch.toLowerCase()) ||
-      b.dia_chi.toLowerCase().includes(searchBranch.toLowerCase())
+      b.ten_chi_nhanh.toLowerCase().includes(timChiNhanh.toLowerCase()) ||
+      b.dia_chi.toLowerCase().includes(timChiNhanh.toLowerCase())
   );
 
-  const filteredProduct = productList.filter(
+  const sanPhamLoc  = danhSachSanPham.filter(
     (b) =>
-      b.ten_san_pham.toLowerCase().includes(searchProduct.toLowerCase())
+      b.ten_san_pham.toLowerCase().includes(timSanPham.toLowerCase())
   );
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-    setSelectedBranch(null);
-    setEditInventory(null);
-    setSelectedProducts([]);
+  const doiTab = (event, newValue) => {
+    setTabDangChon(newValue);
+    setChiNhanhDangChon(null);
+    setTonKhoDangSua(null);
+    setSanPhamDaChon([]);
   };
 
-  const handleSelectBranch = (branch) => {
-    setSelectedBranch(branch);
-    setOpenBranch(false);
-    setSearchBranch("");
+  const chonChiNhanh  = (branch) => {
+    setChiNhanhDangChon(branch);
+    setMoDialogChiNhanh(false);
+    setTimChiNhanh("");
   };
 
-  const handleSelectProduct = (product) => {
-    setSelectedProducts((prev) => {
-      const exists = prev.find((p) => p.ma_san_pham === product.ma_san_pham);
-      if (exists) {
+  const chonSanPham  = (sanPham) => {
+    setSanPhamDaChon((dsCu) => {
+      const daChon  = dsCu.find((p) => p.ma_san_pham === sanPham.ma_san_pham);
+      if (daChon ) {
         // Bỏ chọn
-        const updated = prev.filter((p) => p.ma_san_pham !== product.ma_san_pham);
-        const newQuantities = { ...productQuantities };
-        delete newQuantities[product.ma_san_pham];
-        setProductQuantities(newQuantities);
-        return updated;
+        const dsMoi  = dsCu.filter((p) => p.ma_san_pham !== sanPham.ma_san_pham);
+        const slMoi  = { ...soLuongTheoSanPham };
+        delete slMoi [sanPham.ma_san_pham];
+        setSoLuongTheoSanPham(slMoi );
+        return dsMoi ;
       }
-      setProductQuantities((q) => ({
+      setSoLuongTheoSanPham((q) => ({
         ...q,
-        [product.ma_san_pham]: 1, // default = 1
+        [sanPham.ma_san_pham]: 1, // default = 1
       }));
 
-      return [...prev, product];
+      return [...dsCu, sanPham];
     });
   };
 
-  const handleEditClick = (item) => {
-    setEditInventory(item);
-    setQuantity(item.so_luong_ton);
-    setActiveTab(2);
+  const suaTonKho  = (item) => {
+    setTonKhoDangSua(item);
+    setSoLuong(item.so_luong_ton);
+    setTabDangChon(2);
   };
 
   useEffect(() => {
-    fetchBranchList();
-    fetchProductList();
-    fetchInventory();
-  }, [page,selectedBranch]);
+    layDanhSachChiNhanh();
+    layDanhSachSanPham();
+  }, []);
 
-  const fetchBranchList = async () => {
+  useEffect(() => {
+    layDanhSachChiNhanh();
+    layDanhSachSanPham();
+    layDanhSachTonKho();
+  }, [trang,chiNhanhDangChon]);
+
+  const layDanhSachChiNhanh = async () => {
     try{
       const res = await api.get(`/admins/danh-sach-chi-nhanh`, {
         headers:{ Authorization: `Bearer ${token}` },
       });
       if(res.data.success){
-        setBranches(res.data.data);
+        setDanhSachChiNhanh(res.data.data);
       }
     }catch(error){  
       console.log("Không lấy được danh sách chi nhánh", error);
     }
   };
 
-  const fetchProductList = async () =>{
+  const layDanhSachSanPham = async () =>{
     try{
       const res = await api.get(`/users/tat-ca-san-pham`);
       if (res.data.success){
-        setProductList(res.data.data);
+        setDanhSachSanPham(res.data.data);
       }
     }catch(error){
       console.log("Lấy danh sách sản phẩm thất bại", error)
     }
   };
 
-  const fetchInventory = async () => {
+  const layDanhSachTonKho = async () => {
     try {
-      const offset = (page - 1) * limit;
-      let url = `/admins/danh-sach-ton-kho?limit=${limit}&offset=${offset}`;
-      if (selectedBranch) {
-        url += `&ma_chi_nhanh=${selectedBranch.ma_chi_nhanh}`;
-      }
-
-      const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
+      const offset = (trang - 1) * gioiHan;
+      const res = await api.get(`/admins/danh-sach-ton-kho`, { 
+        params: {
+          limit: gioiHan,
+          offset,
+          tu_khoa: tuKhoaTimKiem || undefined,
+          ma_chi_nhanh: chiNhanhDangChon?.ma_chi_nhanh || undefined
+        },
+        headers: { Authorization: `Bearer ${token}` } });
       if (res.data.success) {
-        setInventoryList(res.data.data.items);
-        setTotal(res.data.data.total);
+        setDanhSachTonKho(res.data.data.items);
+        setTongSo(res.data.data.total);
       }
     } catch (err) {
       console.error("Lấy tồn kho thất bại", err);
     }
   };
 
-  // ⭐ THÊM NHIỀU SẢN PHẨM CÙNG LÚC
-  const handleAddInventory = async () => {
-    if (selectedProducts.length === 0 || !selectedBranch) {
+  const themTonKho  = async () => {
+    if (sanPhamDaChon.length === 0 || !chiNhanhDangChon) {
       alert("Vui lòng chọn sản phẩm, chi nhánh và số lượng");
       return;
     }
@@ -167,10 +180,10 @@ export default function InventoryManage() {
     try {
       // chuẩn bị payload gửi API
       const payload = {
-        items: selectedProducts.map(p => ({
+        items: sanPhamDaChon.map(p => ({
           ma_san_pham: p.ma_san_pham,
-          ma_chi_nhanh: selectedBranch.ma_chi_nhanh,
-          so_luong_ton: productQuantities[p.ma_san_pham] || 1
+          ma_chi_nhanh: chiNhanhDangChon.ma_chi_nhanh,
+          so_luong_ton: soLuongTheoSanPham[p.ma_san_pham] || 1
         }))
       };
 
@@ -199,12 +212,11 @@ export default function InventoryManage() {
 
       if (alertMsg) alert(alertMsg);
 
-      // reset state
-      fetchInventory();
-      setSelectedProducts([]);
-      setSelectedBranch(null);
-      setProductQuantities({});
-      setActiveTab(0);
+      layDanhSachTonKho();
+      setSanPhamDaChon([]);
+      setChiNhanhDangChon(null);
+      setSoLuongTheoSanPham({});
+      setTabDangChon(0);
 
     } catch (err) {
       console.error("Lỗi Axios:", err);
@@ -223,38 +235,44 @@ export default function InventoryManage() {
   };
 
 
-  const handleUpdateInventory = async() => {
-    if(quantity === "")
+  const capNhatTonKho  = async() => {
+    if(soLuong === "")
       return alert("Vui lòng nhập số lượng");
 
     try{
-      const ma_chi_nhanh = editInventory.ma_chi_nhanh;
-      const ma_san_pham = editInventory.ma_san_pham;
+      const ma_chi_nhanh = tonKhoDangSua.ma_chi_nhanh;
+      const ma_san_pham = tonKhoDangSua.ma_san_pham;
 
       const res = await api.put(
         `/admins/cap-nhat-ton-kho/${ma_san_pham}/${ma_chi_nhanh}`,
-        { so_luong_ton: parseInt(quantity) },
+        { so_luong_ton: parseInt(soLuong) },
         { headers: { Authorization: `Bearer ${token}` }}
       );
 
       if(res.data.success){
         alert(res.data.message);
-        fetchInventory();
-        setQuantity("");
-        setSelectedBranch(null);
-        setSelectedProducts([]);
-        setEditInventory(null);
-        setActiveTab(0);
+        layDanhSachTonKho();
+        setSoLuong("");
+        setChiNhanhDangChon(null);
+        setSanPhamDaChon([]);
+        setTonKhoDangSua(null);
+        setTabDangChon(0);
       }
     }catch(err){
-      alert(err.response?.data?.detail || "Cập nhật thất bại")
+      console.error("Lỗi Axios:", err);
+      let errorMsg = "Cập nhật thất bại";
+
+      if (err.response?.data) {
+        if (err.response.data.detail) errorMsg = err.response.data.detail;
+        else if (err.response.data.message) errorMsg = err.response.data.message;
+        else errorMsg = JSON.stringify(err.response.data);
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      alert(errorMsg);
     }
   };
-
-  const filteredData = selectedBranch
-    ? inventoryList.filter(item => item.ma_chi_nhanh === selectedBranch?.ma_chi_nhanh)
-    : inventoryList;
-
 
 
   return (
@@ -262,35 +280,64 @@ export default function InventoryManage() {
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
+        <Tabs value={tabDangChon} onChange={doiTab}>
           <Tab label="Danh sách hàng tồn kho" />
           <Tab label="Thêm sản phẩm cho chi nhánh" />
-          {editInventory && <Tab label="Cập nhật tồn kho" />}
+          {tonKhoDangSua && <Tab label="Cập nhật tồn kho" />}
         </Tabs>
       </Box>
 
       {/* TAB 1 */}
-      {activeTab === 0 && (
-        <Box sx={{ overflowX: "auto", mt: 2 }}>
-          <Stack direction="row" spacing={2} sx={{ mb: 3, mt: 1 }} alignItems="center">
-            <OutlinedInput
-              placeholder="Chọn chi nhánh..."
-              value={ selectedBranch ? selectedBranch.ten_chi_nhanh : "Tất cả chi nhánh" }
-              readOnly
-              fullWidth
-              endAdornment={
-                <IconButton onClick={() => setOpenBranch(true)}>
-                  <ArrowDropDownIcon />
-                </IconButton>
-              }
-              onClick={() => setOpenBranch(true)}
-              sx={{ width: 550, cursor: "pointer" }}
-            />
-            <Typography sx={{ color: "text.secondary" }}>
-              Tổng: <strong>{total}</strong> sản phẩm
-            </Typography>
-          </Stack>
-
+      {tabDangChon === 0 && (
+        <Box>
+          <Paper elevation={0} sx={{ mb: 1, borderRadius: 3 }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  label="Tìm sản phẩm"
+                  placeholder="Nhập tên sản phẩm..."
+                  value={tuKhoaTimKiem}
+                  onChange={(e) => setTuKhoaTimKiem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setTrang(1);
+                      layDanhSachTonKho();
+                    }
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={(e) => {
+                          setTrang(1);
+                          layDanhSachTonKho();
+                        }}>
+                        <Search />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <OutlinedInput
+                    placeholder="Chọn chi nhánh..."
+                    value={ chiNhanhDangChon ? chiNhanhDangChon.ten_chi_nhanh : "Tất cả chi nhánh" }
+                    readOnly
+                    fullWidth
+                    endAdornment={
+                      <IconButton onClick={() => setMoDialogChiNhanh(true)}>
+                        <ArrowDropDownIcon />
+                      </IconButton>
+                    }
+                    onClick={() => setMoDialogChiNhanh(true)}
+                    sx={{ cursor: "pointer" }}  
+                  />
+                </Stack>
+              </Grid>
+            </Grid>
+          </Paper>
           <TableContainer component={Paper} sx={{ borderRadius: 2, border: "1px solid #eee" }}>
             <Table>
               <TableHead>
@@ -303,7 +350,7 @@ export default function InventoryManage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredData.map((item) => (
+                {danhSachTonKho.map((item) => (
                   <TableRow key={item.ma_san_pham} hover>
                     <TableCell>
                       <Box
@@ -318,7 +365,7 @@ export default function InventoryManage() {
                     <TableCell align="center">{item.so_luong_ton}</TableCell>
 
                     <TableCell align="right">
-                      <IconButton color="primary" size="small" onClick={() => handleEditClick(item)}>
+                      <IconButton color="primary" size="small" onClick={() => suaTonKho (item)}>
                         <EditOutlined />
                       </IconButton>
                       <IconButton color="error" size="small">
@@ -332,9 +379,9 @@ export default function InventoryManage() {
 
             <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
               <Pagination
-                count={Math.ceil(total / limit)}
-                page={page}
-                onChange={(_, value) => setPage(value)}
+                count={Math.ceil(tongSo / gioiHan)}
+                page={trang}
+                onChange={(_, value) => setTrang(value)}
                 color="primary"
                 shape="rounded"
               />
@@ -344,22 +391,22 @@ export default function InventoryManage() {
       )}
 
       {/* TAB 2 — THÊM TỒN KHO */}
-      {activeTab === 1 && (
+      {tabDangChon === 1 && (
         <Stack spacing={3}>
           
           {/* SELECT PRODUCTS */}
           <OutlinedInput
             placeholder="Chọn sản phẩm..."
             value={
-              selectedProducts.length > 0
-                ? `${selectedProducts.length} sản phẩm đã chọn`
+              sanPhamDaChon.length > 0
+                ? `${sanPhamDaChon.length} sản phẩm đã chọn`
                 : "Chọn sản phẩm..."
             }
             readOnly
             fullWidth
-            onClick={() => setOpenProduct(true)}
+            onClick={() => setMoDialogSanPham(true)}
             endAdornment={
-              <IconButton onClick={() => setOpenProduct(true)}>
+              <IconButton onClick={() => setMoDialogSanPham(true)}>
                 <ArrowDropDownIcon />
               </IconButton>
             }
@@ -367,9 +414,9 @@ export default function InventoryManage() {
           />
 
           {/* SHOW SELECTED PRODUCTS */}
-          {selectedProducts.length > 0 && (
+          {sanPhamDaChon.length > 0 && (
             <Stack spacing={1} sx={{ mt: 1 }}>
-              {selectedProducts.map((p) => (
+              {sanPhamDaChon.map((p) => (
                 <Box
                   key={p.ma_san_pham}
                   sx={{
@@ -389,9 +436,9 @@ export default function InventoryManage() {
                     type="number"
                     size="small"
                     sx={{ width: 100 }}
-                    value={productQuantities[p.ma_san_pham] || 1}
+                    value={soLuongTheoSanPham[p.ma_san_pham] || 1}
                     onChange={(e) =>
-                      setProductQuantities((prev) => ({
+                      setSoLuongTheoSanPham((prev) => ({
                         ...prev,
                         [p.ma_san_pham]: Math.max(1, parseInt(e.target.value) || 1),
                       }))
@@ -402,7 +449,7 @@ export default function InventoryManage() {
                     size="small"
                     color="error"
                     onClick={() =>
-                      handleSelectProduct(p) // bỏ chọn
+                      chonSanPham (p) // bỏ chọn
                     }
                   >
                     Xoá
@@ -416,12 +463,12 @@ export default function InventoryManage() {
           {/* SELECT BRANCH */}
           <OutlinedInput
             placeholder="Chọn chi nhánh..."
-            value={ selectedBranch ? selectedBranch.ten_chi_nhanh : "Chọn chi nhánh..." }
+            value={ chiNhanhDangChon ? chiNhanhDangChon.ten_chi_nhanh : "Chọn chi nhánh..." }
             readOnly
             fullWidth
-            onClick={() => setOpenBranch(true)}
+            onClick={() => setMoDialogChiNhanh(true)}
             endAdornment={
-              <IconButton onClick={() => setOpenBranch(true)}>
+              <IconButton onClick={() => setMoDialogChiNhanh(true)}>
                 <ArrowDropDownIcon />
               </IconButton>
             }
@@ -433,7 +480,7 @@ export default function InventoryManage() {
           <Button
             variant="contained"
             startIcon={<AddCircleOutline />}
-            onClick={handleAddInventory}
+            onClick={themTonKho }
           >
             Thêm
           </Button>
@@ -441,7 +488,7 @@ export default function InventoryManage() {
       )}
 
       {/* --- TAB 3: UPDATE TỒN KHO --- */}
-      {activeTab === 2 && editInventory && (
+      {tabDangChon === 2 && tonKhoDangSua && (
         <Stack spacing={3}>
           {/* Sản phẩm */}
           <Stack direction="row" spacing={2} sx={{ mb: 3, mt: 1 }} alignItems="center">
@@ -449,7 +496,7 @@ export default function InventoryManage() {
               id="sanpham"
               name="sanpham"
               placeholder="Chọn sản phẩm..."
-              value={editInventory.ten_san_pham}
+              value={tonKhoDangSua.ten_san_pham}
               readOnly
               fullWidth
               endAdornment={
@@ -470,7 +517,7 @@ export default function InventoryManage() {
               id="chinhanh"
               name="chinhanh"
               placeholder="Chọn chi nhánh..."
-              value={editInventory.ten_chi_nhanh}
+              value={tonKhoDangSua.ten_chi_nhanh}
               readOnly
               fullWidth
               endAdornment={
@@ -491,8 +538,8 @@ export default function InventoryManage() {
             label="Số lượng tồn kho"
             name="soluong"
             type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            value={soLuong}
+            onChange={(e) => setSoLuong(e.target.value)}
           />
 
           <Divider sx={{ my: 2 }} />
@@ -503,7 +550,7 @@ export default function InventoryManage() {
               variant="contained"
               startIcon={<EditOutlined />}
               color="primary"
-              onClick={handleUpdateInventory}
+              onClick={capNhatTonKho }
             >
               Lưu thay đổi
             </Button>
@@ -512,20 +559,20 @@ export default function InventoryManage() {
       )}
 
       {/* DIALOG CHỌN CHI NHÁNH */}
-      <Dialog open={openBranch} onClose={() => setOpenBranch(false)} fullWidth maxWidth="sm">
+      <Dialog open={moDialogChiNhanh} onClose={() => setMoDialogChiNhanh(false)} fullWidth maxWidth="sm">
         <DialogTitle>Chọn chi nhánh</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
             placeholder="Tìm theo tên hoặc địa chỉ..."
-            value={searchBranch}
-            onChange={(e) => setSearchBranch(e.target.value)}
+            value={timChiNhanh}
+            onChange={(e) => setTimChiNhanh(e.target.value)}
             InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1 }} /> }}
             sx={{ mb: 2 }}
           />
-          {activeTab === 0 && (
+          {tabDangChon === 0 && (
             <>
-              <ListItemButton onClick={() => handleSelectBranch(null)}>
+              <ListItemButton onClick={() => chonChiNhanh (null)}>
                 <ListItemText
                   primary="Tất cả chi nhánh"
                   secondary="Hiển thị toàn bộ dữ liệu tồn kho"
@@ -536,9 +583,9 @@ export default function InventoryManage() {
           )}
 
           <List>
-            {filteredBranches.map((branch) => (
+            {chiNhanhLoc .map((branch) => (
               <React.Fragment key={branch.ma_chi_nhanh}>
-                <ListItemButton onClick={() => handleSelectBranch(branch)}>
+                <ListItemButton onClick={() => chonChiNhanh (branch)}>
                   <ListItemText primary={branch.ten_chi_nhanh} secondary={branch.dia_chi} />
                 </ListItemButton>
                 <Divider />
@@ -549,21 +596,21 @@ export default function InventoryManage() {
       </Dialog>
 
       {/* DIALOG CHỌN SẢN PHẨM — MULTI SELECT */}
-      <Dialog open={openProduct} onClose={() => setOpenProduct(false)} fullWidth maxWidth="sm">
+      <Dialog open={moDialogSanPham} onClose={() => setMoDialogSanPham(false)} fullWidth maxWidth="sm">
         <DialogTitle>Chọn sản phẩm</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
             placeholder="Tìm sản phẩm..."
-            value={searchProduct}
-            onChange={(e) => setSearchProduct(e.target.value)}
+            value={timSanPham}
+            onChange={(e) => setTimSanPham(e.target.value)}
             InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1 }} /> }}
             sx={{ mb: 2 }}
           />
 
           <List>
-            {filteredProduct.map((product) => {
-              const isSelected = selectedProducts.some(
+            {sanPhamLoc .map((product) => {
+              const isSelected = sanPhamDaChon.some(
                 (p) => p.ma_san_pham === product.ma_san_pham
               );
 
@@ -571,7 +618,7 @@ export default function InventoryManage() {
                 <React.Fragment key={product.ma_san_pham}>
                   <ListItemButton
                     selected={isSelected}
-                    onClick={() => handleSelectProduct(product)}
+                    onClick={() => chonSanPham (product)}
                   >
                     <ListItemText primary={product.ten_san_pham} />
                   </ListItemButton>

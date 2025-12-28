@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { EditOutlined, DeleteOutlined } from '@mui/icons-material';
 import PageWrapper from '../../components/PageWrapper';
-import BranchForm from '../../components/Admin/BranchForm';
+import BranchForm from '../../components/Admin/FormChiNhanh';
 import api from '../../api';
 import { getToken } from '../../utils/auth';
 

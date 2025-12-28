@@ -27,11 +27,11 @@ function Banner() {
                     <SwiperSlide>
                     <div className="row banner-content p-5">
                         <div className="content-wrapper col-md-7">
-                        <div className="categories my-3">100% natural</div>
-                        <h3 className="display-4">Fresh Smoothie & Summer Juice</h3>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                        <div className="categories my-3">100% tự nhiên</div>
+                        <h3 className="display-4">Sinh tố tươi & Nước ép mùa hè</h3>
+                        <p>Thơm ngon, tự nhiên, tốt cho sức khỏe.</p>
                         <a href="#" className="btn btn-outline-dark btn-lg text-uppercase fs-6 rounded-1 px-4 py-3 mt-3">
-                            Shop Now
+                            Mua ngay
                         </a>
                         </div>
                         <div className="img-wrapper col-md-5">
@@ -44,11 +44,11 @@ function Banner() {
                     <SwiperSlide>
                     <div className="row banner-content p-5">
                         <div className="content-wrapper col-md-7">
-                        <div className="categories mb-3 pb-3">100% natural</div>
-                        <h3 className="banner-title">Fresh Smoothie & Summer Juice</h3>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                        <div className="categories mb-3 pb-3">100% tự nhiên</div>
+                        <h3 className="banner-title">Sinh tố tươi & Nước ép mùa hè</h3>
+                        <p>Thơm ngon, tự nhiên, tốt cho sức khỏe.</p>
                         <a href="#" className="btn btn-outline-dark btn-lg text-uppercase fs-6 rounded-1">
-                            Shop Collection
+                            Xem bộ sưu tập
                         </a>
                         </div>
                         <div className="img-wrapper col-md-5">
@@ -61,11 +61,11 @@ function Banner() {
                     <SwiperSlide>
                     <div className="row banner-content p-5">
                         <div className="content-wrapper col-md-7">
-                        <div className="categories mb-3 pb-3">100% natural</div>
-                        <h3 className="banner-title">Heinz Tomato Ketchup</h3>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                        <div className="categories mb-3 pb-3">100% tự nhiên</div>
+                        <h3 className="banner-title">Sốt cà chua Heinz</h3>
+                        <p>Thơm ngon, tự nhiên, tốt cho sức khỏe.</p>
                         <a href="#" className="btn btn-outline-dark btn-lg text-uppercase fs-6 rounded-1">
-                            Shop Collection
+                            Xem bộ sưu tập
                         </a>
                         </div>
                         <div className="img-wrapper col-md-5">
@@ -84,9 +84,9 @@ function Banner() {
                 <div className="row banner-content p-5">
 
                   <div className="content-wrapper col-md-7">
-                    <div className="categories sale mb-3 pb-3">20% off</div>
-                    <h3 className="banner-title">Fruits & Vegetables</h3>
-                    <a href="#" className="d-flex align-items-center nav-link">Shop Collection <svg width="24" height="24"></svg></a>
+                    <div className="categories sale mb-3 pb-3">Giảm 20%</div>
+                    <h3 className="banner-title">Trái cây & Rau củ</h3>
+                    <a href="#" className="d-flex align-items-center nav-link">Xem bộ sưu tập <svg width="24" height="24"></svg></a>
                   </div>
 
                 </div>
@@ -100,9 +100,9 @@ function Banner() {
                 <div className="row banner-content p-5">
 
                   <div className="content-wrapper col-md-7">
-                    <div className="categories sale mb-3 pb-3">15% off</div>
-                    <h3 className="item-title">Baked Products</h3>
-                    <a href="#" className="d-flex align-items-center nav-link">Shop Collection <svg width="24" height="24"></svg></a>
+                    <div className="categories sale mb-3 pb-3">Giảm 15%</div>
+                    <h3 className="item-title">Các sản phẩm nướng</h3>
+                    <a href="#" className="d-flex align-items-center nav-link">Xem bộ sưu tập <svg width="24" height="24"></svg></a>
                   </div>
 
                 </div>

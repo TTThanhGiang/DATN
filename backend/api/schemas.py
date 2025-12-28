@@ -69,6 +69,7 @@ class SanPhamSchema(BaseModel):
     don_gia: int
     giam_gia: Decimal = Field(default=0, ge=0, le=100)
     ma_danh_muc: int
+    ten_danh_muc: str
     don_vi: Optional[str] = None
     hinh_anhs: List[HinhAnhSchema] = []
 
@@ -95,12 +96,21 @@ class GioHangItemResponse(BaseModel):
     class Config:
         orm_mode = True
 
+class ChiTietDonHangCreate(BaseModel):
+    ma_san_pham: int
+    so_luong: int
+    gia_goc: float
+    gia_sau_giam: float
+
 class ThanhToanSchema(BaseModel):
     ma_chi_nhanh: int
     ho_ten: str
     dia_chi_giao_hang: str
     so_dien_thoai: str
+    tien_giam: float
     tong_tien: float
+    phuong_thuc_thanh_toan: str
+    chi_tiet_san_pham: List[ChiTietDonHangCreate]
 
 class NguoiDungCreate(BaseModel):
     ho_ten: str
@@ -208,7 +218,19 @@ class SanPhamDonHangOut(BaseModel):
     ma_san_pham: int
     ten_san_pham: str
     so_luong: int
-    gia_tien: int
+    gia_tien: int | None
+    don_vi: str
+    hinh_anhs:  str | None = None
+
+    class Config:
+        orm_mode = True
+
+class SanPhamLichSuDonHangOut(BaseModel):
+    ma_san_pham: int
+    ten_san_pham: str
+    so_luong: int
+    gia_sau_giam: int | None
+    gia_goc: int 
     don_vi: str
     hinh_anhs:  str | None = None
 
@@ -224,8 +246,26 @@ class DonHangOut(BaseModel):
     trang_thai: str
     trang_thai_thanh_toan: str
     tong_tien: int
+    tien_giam: int | None
     ngay_dat: datetime
-    chi_tiet: list[SanPhamDonHangOut]
+    chi_tiet: list[SanPhamLichSuDonHangOut]
+
+    class Config:
+        orm_mode = True
+
+class DonHangOutAdmin(BaseModel):
+    ma_don_hang: int
+    ho_ten: str
+    dia_chi: str
+    so_dien_thoai: str
+    ma_chi_nhanh: int
+    ten_chi_nhanh: str
+    trang_thai: str
+    trang_thai_thanh_toan: str
+    tong_tien: int
+    tien_giam: int | None
+    ngay_dat: datetime
+    chi_tiet: list[SanPhamLichSuDonHangOut]
 
     class Config:
         orm_mode = True
@@ -282,3 +322,18 @@ class UserBulkCreate(BaseModel):
 
 class BulkReviewRequest(BaseModel):
     so_danh_gia_moi_nguoi: int = 3
+
+class requestData(BaseModel):
+    vnp_Version:str
+    vnp_Command:str
+    vnp_TmnCode:str
+    vnp_Amount:str
+    vnp_CurrCode:str
+    vnp_TxnRef:str
+    vnp_OrderInfo:str
+    vnp_OrderType:str
+    vnp_Locale:str
+    vnp_BankCode:Optional[str]=None
+    vnp_CreateDate:str = datetime.now().strftime('%Y%m%d%H%M%S')
+    vnp_IpAddr:str
+    vnp_ReturnUrl:Optional[str]=None

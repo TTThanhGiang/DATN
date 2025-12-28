@@ -1,111 +1,126 @@
 import { useState, useEffect } from "react";
-import { Box, Button  } from "@mui/material";
-import ProductCard from "../../../components/User/Product/ProductCart";
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  CircularProgress, 
+  Stack, 
+  Skeleton 
+} from "@mui/material";
+import ProductCard from "../../../components/User/Product/TheSanPham";
 import api from "../../../api";
-import { getUser } from "../../../utils/auth";
+import { getUser, getToken } from "../../../utils/auth";
 
-export default function ProductList({ sidebarOpen }) {
-  const [activeTab, setActiveTab] = useState("all");
-  const [loading, setLoading] = useState(true);
+export default function SanPhamGoiYNguoiDung() {
+  const [danhSachGoiY, setDanhSachGoiY] = useState([]);
+  const [dangTai, setDangTai] = useState(true);
 
-  const [categories, setCategories] = useState({});
-  const [allProducts, setAllProducts] = useState([]);
-
-  const DEFAULT_LIMIT = 10;
-  const [visibleCount, setVisibleCount] = useState(DEFAULT_LIMIT);
+  const GIOI_HAN_MAC_DINH = 10;
+  const [soLuongHienThi, setSoLuongHienThi] = useState(GIOI_HAN_MAC_DINH);
 
   useEffect(() => {
-    const fetchTrending = async () => {
-      try {
-        const res = await api.get(`/goi-y/tong-hop/${getUser()?.ma_nguoi_dung}?top_n=5`, {
-            headers: { 
-                Authorization: `Bearer ${getUser()?.token}`,
-            }
-        });
-        const data = res.data.goi_y;
+    const taiSanPhamGoiY = async () => {
+      const nguoiDung = getUser();
+      const token = getToken(); // Ưu tiên lấy token từ hàm helper riêng nếu có
 
-        setAllProducts(data);
+      if (!nguoiDung) return;
+
+      try {
+        // Gọi API gợi ý tổng hợp dựa trên ID người dùng
+        const phanHoi = await api.get(`/goi-y/tong-hop/${nguoiDung.ma_nguoi_dung}?top_n=20`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+          }
+        });
+        
+        if (phanHoi.data && phanHoi.data.goi_y) {
+          setDanhSachGoiY(phanHoi.data.goi_y);
+        }
       } catch (err) {
-        console.error("Lỗi fetch trending:", err);
+        console.error("Lỗi khi tải gợi ý cá nhân hóa:", err);
+      } finally {
+        setDangTai(false);
       }
-      setLoading(false);
     };
 
-    fetchTrending();
+    taiSanPhamGoiY();
   }, []);
 
-  const changeTab = (tab) => {
-    setActiveTab(tab);
-    setVisibleCount(DEFAULT_LIMIT);
-  };
+  const coTheXemThem = soLuongHienThi < danhSachGoiY.length;
 
-  const renderProducts = (items) =>
-     items.slice(0, visibleCount).map((p) => (
-      <ProductCard 
-        key={p.ma_san_pham} 
-        product={{ ...p, quantity: 1 }} 
-        onAddToCart={() => console.log("Add to cart", p)} 
-      />
-    ));
+  if (dangTai) {
+    return (
+      <Box sx={{ py: 3 }}>
+        <Skeleton variant="text" width={250} height={40} sx={{ mb: 2 }} />
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2,
+            gridTemplateColumns: {
+              xs: "repeat(2, 1fr)",
+              sm: "repeat(3, 1fr)",
+              md: "repeat(5, 1fr)",
+            },
+          }}
+        >
+          {[...Array(5)].map((_, index) => (
+            <Skeleton key={index} variant="rectangular" height={300} sx={{ borderRadius: 2 }} />
+          ))}
+        </Box>
+      </Box>
+    );
+  }
 
-  if (loading) return <p>Loading...</p>;
-
-  // Lấy danh sách sản phẩm của tab hiện tại
-  const currentProducts =
-    activeTab === "all"
-      ? allProducts
-      : categories[activeTab]?.san_phams || [];
-
-  const canShowMore = visibleCount < currentProducts.length;  
+  // Nếu không có gợi ý nào, không render component để tránh khoảng trắng thừa
+  if (danhSachGoiY.length === 0) return null;
 
   return (
-    <section className="py-5">
-      <div className="container-fluid">
-        <div className="bootstrap-tabs product-tabs">
+    <Box component="section" sx={{ py: 3 }}>
+      {/* Tiêu đề được cá nhân hóa */}
+      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
+        <Typography variant="h5" fontWeight={700} color="secondary.main">
+          ✨ Dành riêng cho bạn
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+          (Dựa trên sở thích của bạn)
+        </Typography>
+      </Stack>
 
-          {/* Tabs Header */}
-          <div className="tabs-header d-flex justify-content-between border-bottom mb-4">
-            <h3>Có thể bạn thích</h3>
-          </div>
+      {/* Lưới sản phẩm */}
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: {
+            xs: "repeat(2, 1fr)",
+            sm: "repeat(3, 1fr)",
+            md: "repeat(4, 1fr)",
+            lg: "repeat(5, 1fr)",
+          },
+        }}
+      >
+        {danhSachGoiY.slice(0, soLuongHienThi).map((sp) => (
+          <ProductCard 
+            key={sp.ma_san_pham} 
+            sanPham={{ ...sp, quantity: 1 }} 
+            onAddToCart={() => console.log("Thêm vào giỏ từ mục Gợi ý:", sp)} 
+          />
+        ))}
+      </Box>
 
-          {/* Danh sách sản phẩm */}
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2,
-              gridTemplateColumns: {
-                xs: "repeat(2, 1fr)",
-                sm: "repeat(3, 1fr)",
-                md: "repeat(auto-fill, minmax(220px, 1fr))",
-              },
-            }}
+      {/* Nút Xem thêm */}
+      {coTheXemThem && (
+        <Box sx={{ textAlign: "center", mt: 4 }}>
+          <Button 
+            variant="outlined" 
+            color="secondary"
+            onClick={() => setSoLuongHienThi(prev => prev + 10)}
+            sx={{ borderRadius: 8, px: 5, borderWidth: 2, fontWeight: 'bold' }}
           >
-            {renderProducts(currentProducts)}
-          </Box>
-
-          {/* Nút Xem thêm / Thu gọn */}
-          <div className="text-center mt-3">
-            {canShowMore ? (
-              <Button 
-                variant="contained" 
-                onClick={() => setVisibleCount(currentProducts.length)}
-              >
-                Xem thêm {currentProducts.length - visibleCount} sản phẩm
-              </Button>
-            ) : (
-              currentProducts.length > DEFAULT_LIMIT && (
-                <Button 
-                  variant="outlined" 
-                  onClick={() => setVisibleCount(DEFAULT_LIMIT)}
-                >
-                  Thu gọn
-                </Button>
-              )
-            )}
-          </div>
-
-        </div>
-      </div>
-    </section>
+            Khám phá thêm
+          </Button>
+        </Box>
+      )}
+    </Box>
   );
 }

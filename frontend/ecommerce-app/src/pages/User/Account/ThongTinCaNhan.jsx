@@ -7,53 +7,53 @@ import api from "../../../api";
 
 export default function ThongTinCaNhan() {
 
-  const [profile, setProfile] = useState(null);
   const [moHopThoaiMatKhau, setMoHopThoaiMatKhau] = useState(false);
-  
-  const [previewAvatar, setPreviewAvatar] = useState(null);
   const token = getToken();
 
-  const handleChange = (e) => {
+  const [thongTin, setThongTin] = useState(null);
+  const [anhXemTruoc, setAnhXemTruoc] = useState(null);
+
+  const xuLyThayDoi = (e) => {
     const { name, value } = e.target;
-    setProfile(prev => ({
+    setThongTin(prev => ({
       ...prev,
       [name]: value
     }));
   };
 
   useEffect(() => {
-      fetchProfile();
-    }, []);
+    taiThongTinCaNhan();
+  }, []);
 
-  const fetchProfile = async () => {
+  const taiThongTinCaNhan = async () => {
     try {
       const res = await api.get(`/users/thong-tin-ca-nhan`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log(res.data.data);
+      console.log(res.data.data.ngay_sinh)
       if (res.data.success) {
-        setProfile(res.data.data);
+        setThongTin(res.data.data);
       }
     } catch (err) {
       console.log("Lấy thông tin thất bại", err);
     }
   };
 
-  const handleCapNhatProfile = async ()=>{
+  const xuLyCapNhatThongTin = async ()=>{
     try{
       const payload = {
-        ho_ten: profile.ho_ten,
-        email: profile.email,
-        dia_chi: profile.dia_chi,
-        ngay_sinh: new Date(profile.ngay_sinh).toISOString(),
-        gioi_tinh: profile.gioi_tinh,
+        ho_ten: thongTin.ho_ten,
+        email: thongTin.email,
+        dia_chi: thongTin.dia_chi,
+        ngay_sinh: new Date(thongTin.ngay_sinh).toISOString(),
+        gioi_tinh: thongTin.gioi_tinh,
       };
       const res = await api.put(`/users/cap-nhat-thong-tin`, payload, {
         headers: {Authorization: `Bearer ${token}`}
       })
       if(res.data.success){
         alert(res.data.message);
-        fetchProfile();
+        taiThongTinCaNhan();
       } else{
         alert(res.data.message);
       }
@@ -62,7 +62,7 @@ export default function ThongTinCaNhan() {
     }
   }
 
-    const handleAvatarChange = async (e) => {
+  const xuLyThayDoiAnh = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const formData = new FormData();
@@ -77,7 +77,7 @@ export default function ThongTinCaNhan() {
       if (res.data.success) {
         alert(res.data.message);
         // Cập nhật preview avatar
-        setPreviewAvatar(res.data.data.duong_dan);
+        setAnhXemTruoc(res.data.data.duong_dan);
       } else {
         alert(res.data.message || "Cập nhật ảnh thất bại");
       }
@@ -112,7 +112,10 @@ export default function ThongTinCaNhan() {
       alert(loi);
     }
   };
-  if (!profile) return <div>Đang tải...</div>;
+
+
+  
+  if (!thongTin) return <div>Đang tải...</div>;
 
   return (
   <Box sx={{ width: "100%", pb: 4 }}>
@@ -127,20 +130,17 @@ export default function ThongTinCaNhan() {
       <Typography variant="h6" fontWeight={600} mb={3}>
         Thông tin cá nhân
       </Typography>
-
-      {/* Container chính điều khiển Layout */}
       <Box
         sx={{
           display: "flex",
-          flexDirection: { xs: "column", md: "row" }, // Mobile: Dọc | Desktop: Ngang
-          gap: 3, // Khoảng cách giữa 2 khối
+          flexDirection: { xs: "column", md: "row" },
+          gap: 3, 
           alignItems: "stretch",
         }}
       >
-        {/* ===== KHỐI 1: AVATAR (Chiếm ~25% trên Desktop) ===== */}
         <Box
           sx={{
-            width: { xs: "100%", md: "280px" }, // Cố định chiều rộng trên desktop
+            width: { xs: "100%", md: "280px" },
             flexShrink: 0,
           }}
         >
@@ -159,14 +159,14 @@ export default function ThongTinCaNhan() {
               hidden
               id="avatar-upload"
               accept="image/*"
-              onChange={handleAvatarChange}
+              onChange={xuLyThayDoiAnh}
             />
 
             <label htmlFor="avatar-upload">
               <Avatar
                 src={
-                  previewAvatar ||
-                  profile.hinh_anhs?.[0]?.duong_dan ||
+                  anhXemTruoc ||
+                  thongTin.hinh_anhs?.[0]?.duong_dan ||
                   "https://i.pravatar.cc/150"
                 }
                 sx={{
@@ -181,7 +181,7 @@ export default function ThongTinCaNhan() {
             </label>
 
             <Typography fontWeight={600} mb={2}>
-              {profile.ho_ten}
+              {thongTin.ho_ten}
             </Typography>
 
             <Stack spacing={1.5}>
@@ -225,15 +225,15 @@ export default function ThongTinCaNhan() {
                 <TextField
                   label="Họ và tên"
                   name="ho_ten"
-                  value={profile.ho_ten || ""}
-                  onChange={handleChange}
+                  value={thongTin.ho_ten || ""}
+                  onChange={xuLyThayDoi}
                   fullWidth
                 />
                 <TextField
                   label="Email"
                   name="email"
-                  value={profile.email || ""}
-                  onChange={handleChange}
+                  value={thongTin.email || ""}
+                  onChange={xuLyThayDoi}
                   fullWidth
                 />
               </Box>
@@ -241,7 +241,7 @@ export default function ThongTinCaNhan() {
               <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
                 <TextField
                   label="Số điện thoại"
-                  value={profile.so_dien_thoai || ""}
+                  value={thongTin.so_dien_thoai || ""}
                   disabled
                   fullWidth
                 />
@@ -250,8 +250,8 @@ export default function ThongTinCaNhan() {
                   type="date"
                   name="ngay_sinh"
                   InputLabelProps={{ shrink: true }}
-                  value={profile.ngay_sinh ? profile.ngay_sinh.split("T")[0] : ""}
-                  onChange={handleChange}
+                  value={thongTin.ngay_sinh ? thongTin.ngay_sinh.split("T")[0] : ""}
+                  onChange={xuLyThayDoi}
                   fullWidth
                 />
               </Box>
@@ -259,8 +259,8 @@ export default function ThongTinCaNhan() {
               <TextField
                 label="Địa chỉ"
                 name="dia_chi"
-                value={profile.dia_chi || ""}
-                onChange={handleChange}
+                value={thongTin.dia_chi || ""}
+                onChange={xuLyThayDoi}
                 fullWidth
               />
 
@@ -268,8 +268,8 @@ export default function ThongTinCaNhan() {
                 select
                 label="Giới tính"
                 name="gioi_tinh"
-                value={profile.gioi_tinh || "KHAC"}
-                onChange={handleChange}
+                value={thongTin.gioi_tinh || "KHAC"}
+                onChange={xuLyThayDoi}
                 sx={{ maxWidth: { md: "50%" } }}
                 fullWidth
                 SelectProps={{ native: true }}
@@ -283,7 +283,7 @@ export default function ThongTinCaNhan() {
                 <Button
                   variant="contained"
                   size="large"
-                  onClick={handleCapNhatProfile}
+                  onClick={xuLyCapNhatThongTin}
                   sx={{ minWidth: 200, width: { xs: "100%", md: "auto" } }}
                 >
                   Cập nhật thông tin

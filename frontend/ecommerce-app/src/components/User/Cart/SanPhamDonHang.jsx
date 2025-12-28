@@ -1,21 +1,22 @@
 import React from "react";
-import { Box, Typography, IconButton, Button, Divider } from "@mui/material";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import AddIcon from "@mui/icons-material/Add";
-import RemoveIcon from "@mui/icons-material/Remove";
+import { Box, Typography } from "@mui/material";
 
 export default function SanPhamDonHang({
-  name,
-  pricePerKg,
-  weight,
-  image,
-  quantity,
-  onQuantityChange,
-  onDelete,
+  ten_san_pham,
+  gia_goc,
+  gia_sau_giam,
+  don_vi,
+  hinh_anh,
+  so_luong,
 }) {
-  const handleIncrease = () => onQuantityChange(quantity + 1);
-  const handleDecrease = () => onQuantityChange(quantity > 1 ? quantity - 1 : 0);
-  const totalPrice = pricePerKg * quantity;
+  // 1. Tính toán giá trị
+  const tong_tien = gia_sau_giam * so_luong;
+  const tong_gia_goc = gia_goc * so_luong;
+  
+  // 2. Tính % giảm giá (nếu có)
+  const phan_tram_giam = gia_goc > gia_sau_giam 
+    ? Math.round(((gia_goc - gia_sau_giam) / gia_goc) * 100) 
+    : 0;
 
   return (
     <Box
@@ -29,25 +30,59 @@ export default function SanPhamDonHang({
         "&:hover": { boxShadow: 3 },
       }}
     >
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+      <Box display="flex" justifyContent="space-between" alignItems="center">
         <Box display="flex" alignItems="center" gap={2}>
+          {/* Hình ảnh sản phẩm */}
           <Box
             component="img"
-            src={image}
-            alt={name}
-            sx={{ width: 80, height: 80, objectFit: "cover", borderRadius: 1, border: "1px solid #eee" }}
+            src={hinh_anh}
+            alt={ten_san_pham}
+            sx={{ width: 60, height: 60, objectFit: "cover", borderRadius: 1, border: "1px solid #eee" }}
           />
+          
           <Box>
-            <Typography fontWeight="bold">{quantity} x {name}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {pricePerKg.toLocaleString()}đ/{weight}
+            <Typography fontWeight="bold" variant="body1">
+              {so_luong} x {ten_san_pham}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Đơn giá: {gia_goc.toLocaleString()}đ/{don_vi}
             </Typography>
           </Box>
         </Box>
 
-        <Typography fontWeight="bold" fontSize="18px">
-          {totalPrice.toLocaleString()}đ
-        </Typography>
+        {/* Khu vực hiển thị giá */}
+        <Box sx={{ textAlign: "right" }}>
+          {gia_sau_giam < gia_goc && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end", mb: 0.5 }}>
+              {/* Phần trăm giảm giá */}
+              <Typography
+                sx={{
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  color: "#fff",
+                  backgroundColor: "#ff4d4f",
+                  borderRadius: "4px",
+                  px: 0.5,
+                }}
+              >
+                -{phan_tram_giam}%
+              </Typography>
+              
+              {/* Giá cũ gạch ngang */}
+              <Typography
+                variant="body2"
+                sx={{ textDecoration: "line-through", color: "#9DA7BC" }}
+              >
+                {tong_gia_goc.toLocaleString()}đ
+              </Typography>
+            </Box>
+          )}
+
+          {/* Giá tổng cuối cùng */}
+          <Typography fontWeight="bold" fontSize="18px" color="primary.main">
+            {tong_tien.toLocaleString()}đ
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );

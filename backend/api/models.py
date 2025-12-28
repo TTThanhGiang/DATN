@@ -231,8 +231,8 @@ class DonHang(Base):
     trang_thai = Column(trang_thai_don_hang_enum, default="CHO_XU_LY")
     trang_thai_thanh_toan = Column(trang_thai_thanh_toan_enum, default="CHUA_THANH_TOAN")
     # ĐÃ CHUYỂN SANG INTEGER
+    tien_giam = Column(Integer, nullable=False, comment="Đơn vị: Đồng") 
     tong_tien = Column(Integer, nullable=False, comment="Đơn vị: Đồng") 
-
     nguoi_dung = relationship("NguoiDung", back_populates="don_hangs")
     chi_nhanh = relationship("ChiNhanh", back_populates="don_hangs")
     chi_tiet_don_hangs = relationship("ChiTietDonHang", back_populates="don_hang", cascade="all, delete-orphan")
@@ -245,7 +245,8 @@ class ChiTietDonHang(Base):
     ma_san_pham = Column(Integer, ForeignKey("san_pham.ma_san_pham"), primary_key=True)
     so_luong = Column(Integer, nullable=False)
     # ĐÃ CHUYỂN SANG INTEGER
-    gia_tien = Column(Integer, nullable=False, comment="Đơn vị: Đồng") 
+    gia_goc = Column(Integer, nullable=False, comment="Đơn vị: Đồng") 
+    gia_sau_giam = Column(Integer, nullable=False, comment="Đơn vị: Đồng") 
 
     don_hang = relationship("DonHang", back_populates="chi_tiet_don_hangs")
     san_pham = relationship("SanPham", back_populates="chi_tiet_don_hangs")

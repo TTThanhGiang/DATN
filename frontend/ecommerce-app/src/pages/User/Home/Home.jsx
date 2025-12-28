@@ -5,9 +5,11 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  Stack,
+  Container,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import Sidebar from "../../../components/User/SideBar";
+import Sidebar from "../../../components/User/Home/SideBar";
 import Banner from "../../../components/User/Home/Banner";
 import KhuyenMaiSection from "../../../components/User/Khuyến mãi/KhuyenMaiSection";
 import SanPhamThinhHanh from "../Products/SanPhamThinhHanh";
@@ -15,111 +17,115 @@ import SanPhamPhoBien from "../Products/SanPhamPhoBien";
 import SanPhamGoiYNguoiDung from "../Products/SanPhamGoiYNguoiDung";
 import { getUser } from "../../../utils/auth";
 
-const SIDEBAR_WIDTH = 300;
+const CHIEU_RONG_SIDEBAR = 300;
 
-function HomePage() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [user, setUser] = useState(null);
+function TrangChu() {
+  const [moSidebar, setMoSidebar] = useState(true);
+  const [danhMucDaChon, setDanhMucDaChon] = useState(null);
+  const [nguoiDung, setNguoiDung] = useState(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   useEffect(() => {
-    setSidebarOpen(!isMobile);
-
-    // ✅ lấy user khi mount
-    setUser(getUser());
-
-    const capNhatUser = () => {
-      setUser(getUser());
-    };
-
-    const capNhatKhiLogout = () => {
-      setUser(null);
-    };
-
-    window.addEventListener("user-login", capNhatUser);
-    window.addEventListener("user-logout", capNhatKhiLogout);
-
+    setMoSidebar(!isMobile);
+    setNguoiDung(getUser());
+    const capNhatNguoiDung = () => setNguoiDung(getUser());
+    const xoaNguoiDung = () => setNguoiDung(null);
+    window.addEventListener("user-login", capNhatNguoiDung);
+    window.addEventListener("user-logout", xoaNguoiDung);
     return () => {
-      window.removeEventListener("user-login", capNhatUser);
-      window.removeEventListener("user-logout", capNhatKhiLogout);
+      window.removeEventListener("user-login", capNhatNguoiDung);
+      window.removeEventListener("user-logout", xoaNguoiDung);
     };
   }, [isMobile]);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8f9fa" }}>
-      {/* MOBILE SIDEBAR OVERLAY */}
-      {isMobile && sidebarOpen && (
+      
+      {/* LỚP PHỦ SIDEBAR CHO ĐIỆN THOẠI */}
+      {isMobile && moSidebar && (
         <Box
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setMoSidebar(false)}
           sx={{
             position: "fixed",
             inset: 0,
-            bgcolor: "rgba(0,0,0,0.4)",
+            bgcolor: "rgba(0,0,0,0.5)",
             zIndex: 900,
           }}
         />
       )}
 
-      {/* SIDEBAR */}
+      {/* THANH DANH MỤC (SIDEBAR) */}
       <Box
         sx={{
           position: "fixed",
           top: isMobile ? 0 : 110,
           left: 0,
-          width: SIDEBAR_WIDTH,
+          width: CHIEU_RONG_SIDEBAR,
           height: isMobile ? "100vh" : "calc(100vh - 110px)",
           bgcolor: "#fff",
           borderRight: "1px solid #e0e0e0",
-          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 0.3s ease",
-          zIndex: isMobile ? 900 : 600,
+          transform: moSidebar ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          zIndex: isMobile ? 1000 : 600,
           overflowY: "auto",
         }}
       >
         <Sidebar
-          open={sidebarOpen}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
+          open={moSidebar}
+          selectedCategory={danhMucDaChon}
+          onSelectCategory={setDanhMucDaChon}
         />
       </Box>
 
-      {/* MAIN */}
+      {/* NỘI DUNG CHÍNH */}
       <Box
-       sx={{
+        component="main"
+        sx={{
           flex: 1,
-          ml: !isMobile && sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
-
-          width: !isMobile && sidebarOpen
-            ? `calc(100% - ${SIDEBAR_WIDTH}px)`
+          ml: !isMobile && moSidebar ? `${CHIEU_RONG_SIDEBAR}px` : 0,
+          width: !isMobile && moSidebar 
+            ? `calc(100% - ${CHIEU_RONG_SIDEBAR}px)` 
             : "100%",
-
           transition: "margin-left 0.3s ease, width 0.3s ease",
-          p: 3,
+          p: { xs: 1, sm: 2, md: 3 },
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-          <IconButton onClick={() => setSidebarOpen((v) => !v)}>
+        {/* THANH CÔNG CỤ ĐIỀU KHIỂN SIDEBAR */}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <IconButton 
+            onClick={() => setMoSidebar((prev) => !prev)}
+            sx={{ bgcolor: "#fff", boxShadow: 1, "&:hover": { bgcolor: "#eee" } }}
+          >
             <MenuIcon />
           </IconButton>
-
-          {!sidebarOpen && !isMobile && (
-            <Typography fontWeight={600}>Danh mục sản phẩm</Typography>
+          {!moSidebar && !isMobile && (
+            <Typography variant="subtitle1" fontWeight={700} color="primary.main">
+              Mở danh mục sản phẩm
+            </Typography>
           )}
-        </Box>
+        </Stack>
 
-        <KhuyenMaiSection />
-        
-        <Banner />
+        <Container maxWidth="xl" disableGutters>
+          <Stack spacing={4}>
+            <KhuyenMaiSection />
+            
+            <Banner />
 
-        {user && <SanPhamGoiYNguoiDung />}
-        <SanPhamPhoBien />
-        <SanPhamThinhHanh />
+            {nguoiDung && (
+              <SanPhamGoiYNguoiDung />
+            )}
+
+            <SanPhamPhoBien />
+
+            <SanPhamThinhHanh />
+
+          </Stack>
+        </Container>
       </Box>
     </Box>
   );
 }
 
-export default HomePage;
+export default TrangChu;
