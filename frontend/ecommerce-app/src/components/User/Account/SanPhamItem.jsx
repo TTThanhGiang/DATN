@@ -1,6 +1,8 @@
 import { Box, Typography, Card, CardMedia, Button } from "@mui/material";
 
 export default function SanPhamItem({ sanPham, suKienDanhGia }) {
+  const giaHienTai = sanPham.gia_sau_giam || sanPham.gia_goc;
+  const tongTienSanPham = giaHienTai * sanPham.so_luong;
 
   return (
     <Card
@@ -28,7 +30,7 @@ export default function SanPhamItem({ sanPham, suKienDanhGia }) {
         </Typography>
 
         <Typography variant="body2" color="text.secondary">
-          Phân loại hàng: {sanPham.don_vi}
+          {sanPham.gia_goc.toLocaleString()}₫/ {sanPham.don_vi}
         </Typography>
 
         <Typography variant="body2" color="text.secondary">
@@ -37,11 +39,11 @@ export default function SanPhamItem({ sanPham, suKienDanhGia }) {
 
         <Box mt={1}>
           <Typography sx={{ fontWeight: 600, color: "red", fontSize: "16px" }}>
-            {(sanPham.gia_sau_giam || sanPham.gia_goc).toLocaleString()}₫
+            {tongTienSanPham.toLocaleString()}₫
           </Typography>
 
-          {/* Giá gốc (Chỉ hiện và gạch ngang nếu có giảm giá) */}
-          {sanPham.gia_sau_giam && (
+          {/* Giá gốc đơn vị (Chỉ hiện và gạch ngang nếu thực sự có giảm giá) */}
+          {sanPham.gia_sau_giam && sanPham.gia_sau_giam < sanPham.gia_goc && (
             <Typography 
               sx={{ 
                 textDecoration: "line-through", 

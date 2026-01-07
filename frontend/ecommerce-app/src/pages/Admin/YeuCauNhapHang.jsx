@@ -165,6 +165,15 @@ export default function YeuCauNhapHang(){
         ? danhSachYeuCau.filter(item => item.ma_chi_nhanh === chiNhanhDaChon?.ma_chi_nhanh)
         : danhSachYeuCau;
 
+    const getStatusText = (status) => {
+        switch (status) {
+            case "CHO_XU_LY": return "Chờ xử lý";
+            case "DA_DUYET": return "Đã duyệt";
+            case "DA_HUY": return "Đã từ chối";
+            default: return status || "";
+        }
+    };
+
     return (
         <PageWrapper title="Yêu cầu nhập hàng">
             <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
@@ -220,16 +229,17 @@ export default function YeuCauNhapHang(){
                                 ))}
                             </TableBody>
                         </Table>
-                        <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
-                            <Pagination
-                                count={Math.ceil(tongSoYeuCau / soLuongMoiTrang)}
-                                page={trangHienTai}
-                                onChange={(_, giaTri) => setTrangHienTai(giaTri)}
-                                color="primary"
-                                shape="rounded"
-                            />
-                        </Stack>
+                        
                     </TableContainer>
+                    <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
+                        <Pagination
+                            count={Math.ceil(tongSoYeuCau / soLuongMoiTrang)}
+                            page={trangHienTai}
+                            onChange={(_, giaTri) => setTrangHienTai(giaTri)}
+                            color="primary"
+                            shape="rounded"
+                        />
+                    </Stack>
                 </Box>
             )}
             {tabDangChon === 1 && (
@@ -247,7 +257,7 @@ export default function YeuCauNhapHang(){
                     <TextField
                         fullWidth
                         label="Trạng thái"
-                        value={chiTietYeuCau.trang_thai}
+                        value={getStatusText(chiTietYeuCau.trang_thai)}
                     />
                     <OutlinedInput
                         fullWidth
@@ -258,9 +268,8 @@ export default function YeuCauNhapHang(){
                                 ? `${sanPhamDaChon.length} sản phẩm đã chọn`
                                 : "Chọn sản phẩm..."
                         }
-                        onClick={() => setMoDialogSanPham(true)}
                         endAdornment={
-                            <IconButton onClick={() => setMoDialogSanPham(true)}>
+                            <IconButton>
                                 <ArrowDropDownIcon />
                             </IconButton>
                         }
@@ -317,6 +326,8 @@ export default function YeuCauNhapHang(){
                     />
                     <Divider sx={{ my: 2 }} />
                     <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+                    {chiTietYeuCau.trang_thai === "CHO_XU_LY" ? (
+                        <>
                         <Button
                             variant="contained"
                             color="primary"
@@ -332,6 +343,22 @@ export default function YeuCauNhapHang(){
                         >
                             Từ chối
                         </Button>
+                        </>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            color={chiTietYeuCau.trang_thai === "DA_DUYET" ? "success" : "error"}
+                            disabled
+                            sx={{ 
+                                "&.Mui-disabled": { 
+                                    backgroundColor: chiTietYeuCau.trang_thai === "DA_DUYET" ? "#2e7d32" : "#d32f2f", 
+                                    color: "#fff" 
+                                } 
+                            }}
+                        >
+                        {chiTietYeuCau.trang_thai === "DA_DUYET" ? "Đã duyệt" : "Đã từ chối"}
+                        </Button>
+                    )}
                     </Stack>
                 </Stack>
             )}

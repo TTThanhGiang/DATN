@@ -233,7 +233,7 @@ export default function QuanLySanPham() {
                   <TableCell>{sp.ten_san_pham}</TableCell>
                   <TableCell>{sp.ten_danh_muc}</TableCell>
                   <TableCell>{sp.don_gia}</TableCell>
-                  <TableCell>{sp.giam_gia}</TableCell>
+                  <TableCell>{sp.giam_gia}%</TableCell>
                   <TableCell>{sp.don_vi}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -250,7 +250,9 @@ export default function QuanLySanPham() {
             </TableBody>
           </Table>
 
-          <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
+          
+        </TableContainer>
+        <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
             <Pagination
               count={Math.ceil(tongSo / limit)}
               page={trang}
@@ -259,7 +261,6 @@ export default function QuanLySanPham() {
               shape="rounded"
             />
           </Stack>
-        </TableContainer>
         </Box>
       )}
 

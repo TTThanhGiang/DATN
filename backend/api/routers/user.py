@@ -4,17 +4,18 @@ from datetime import datetime
 from io import BytesIO
 import os
 from zoneinfo import ZoneInfo
-from fastapi import Query, Request, UploadFile
+from fastapi import BackgroundTasks, Query, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi import APIRouter, Depends, HTTPException
 import urllib.parse
 
 from fastapi.responses import RedirectResponse
 from api.routers.vnpay import create_vnpay_url, hmac_sha512
+from api.utils.email import gui_email_xac_nhan_don_hang
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import desc
 from typing import List
-from api.models import ChiNhanh, ChiTietDonHang, ChiTietGioHang, DanhGia, DanhMucSanPham, DonHang, GioHang, KhuyenMai, LichSuXem, NguoiDung, SanPham, HinhAnh, SanPhamKhuyenMai
+from api.models import ChiNhanh, ChiTietDonHang, ChiTietGioHang, DanhGia, DanhMucSanPham, DonHang, GioHang, KhuyenMai, LichSuXem, NguoiDung, SanPham, HinhAnh, SanPhamKhuyenMai, TonKho
 from api.database import SessionLocal, get_db
 from api.schemas import BulkReviewRequest, CapNhatProfile, DanhMucCreate, DanhMucSchema, DonHangOut, FormDanhGia, GioHangItemCreate, GioHangItemResponse, SanPhamDonHangOut, SanPhamLichSuDonHangOut, SanPhamSchema, HinhAnhSchema, ThanhToanSchema, ThayDoiMatKhau, UserBulkCreate
 from api.utils.response_helpers import success_response, error_response
@@ -162,7 +163,6 @@ def them_danh_muc_hang_loat(
         "data": ket_qua,
         "message": "Đã xử lý danh sách danh mục"
     }
-
 
 @router.get("/san-pham/", response_model=List[SanPhamSchema])
 def get_all_san_pham():
@@ -384,6 +384,7 @@ def lay_thong_tin_khuyen_mai(ma_code: str, db: Session = Depends(get_db)):
         data={
             "ma_code": khuyen_mai.ma_code,
             "giam_gia": float(khuyen_mai.giam_gia),
+            "chi_nhanh_ap_dung": khuyen_mai.ma_chi_nhanh if khuyen_mai.ma_chi_nhanh else None,
             "ngay_bat_dau": khuyen_mai.ngay_bat_dau.isoformat(),
             "ngay_ket_thuc": khuyen_mai.ngay_ket_thuc.isoformat(),
             "san_pham_ap_dung": [sp.ma_san_pham for sp in khuyen_mai.san_pham_khuyen_mais]
@@ -393,7 +394,7 @@ def lay_thong_tin_khuyen_mai(ma_code: str, db: Session = Depends(get_db)):
     )
 
 @router.post("/thanh-toan")
-async def thanh_toan(payload: ThanhToanSchema, request: Request, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
+async def thanh_toan(payload: ThanhToanSchema, request: Request, background_tasks: BackgroundTasks, currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), db: Session = Depends(get_db)):
 
     gio_hang = db.query(GioHang).filter(GioHang.ma_nguoi_dung == currents_user.ma_nguoi_dung).first()
 
@@ -435,6 +436,14 @@ async def thanh_toan(payload: ThanhToanSchema, request: Request, currents_user: 
 
     db.query(ChiTietGioHang).filter_by(ma_gio_hang=gio_hang.ma_gio_hang).delete()
     db.commit()
+    background_tasks.add_task(
+        gui_email_xac_nhan_don_hang,
+        email=currents_user.email,
+        ho_ten=payload.ho_ten,
+        don_hang=don_hang,
+        chi_tiet=payload.chi_tiet_san_pham,
+        phuong_thuc=payload.phuong_thuc_thanh_toan # 'vnpay' hoặc 'cod'
+    )
 
     return success_response(
         data={
@@ -443,6 +452,36 @@ async def thanh_toan(payload: ThanhToanSchema, request: Request, currents_user: 
         },
         message="Tạo đơn hàng thành công.",    
         status_code=200
+    )
+
+@router.get("/re-payment/{ma_don_hang}")
+async def re_payment(
+    ma_don_hang: int, 
+    request: Request, 
+    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai), 
+    db: Session = Depends(get_db)
+):
+    don_hang = db.query(DonHang).filter(
+        DonHang.ma_don_hang == ma_don_hang,
+        DonHang.ma_nguoi_dung == currents_user.ma_nguoi_dung
+    ).first()
+
+    if not don_hang:
+        return error_response({"error": "Đơn hàng không tồn tại"}, 404)
+
+    if don_hang.trang_thai_thanh_toan == "DA_THANH_TOAN": 
+        return error_response({"error": "Đơn hàng này đã được thanh toán rồi"}, 400)
+
+    ip_addr = request.client.host if request.client.host != "::1" else "127.0.0.1"
+    payment_url = create_vnpay_url(
+        ma_don_hang=don_hang.ma_don_hang,
+        tong_tien=don_hang.tong_tien,
+        ip_addr=ip_addr
+    )
+
+    return success_response(
+        data={"payment_url": payment_url},
+        message="Lấy link thanh toán thành công."
     )
 
 @router.get("/vnpay_return")
@@ -464,11 +503,13 @@ async def vnpay_ipn(request: Request, db: Session = Depends(get_db)):
             if response_code == "00":
                 don_hang.trang_thai_thanh_toan = "DA_THANH_TOAN"
                 db.commit()
-            return RedirectResponse(url=f"{HOST_FRONTEND}")
+                return RedirectResponse(url=f"{HOST_FRONTEND}/thanh-toan-thanh-cong?orderId={ma_don_hang}")
+            else:
+                return RedirectResponse(url=f"{HOST_FRONTEND}/thanh-toan-that-bai?orderId={ma_don_hang}")
         else:
-            return RedirectResponse(url=f"{HOST_FRONTEND}/gio-hang?status=failed")
+            return RedirectResponse(url=f"{HOST_FRONTEND}/thanh-toan-that-bai?status=not_found")
     else:
-        return RedirectResponse(url=f"{HOST_FRONTEND}/gio-hang?status=invalid_signature")
+        return RedirectResponse(url=f"{HOST_FRONTEND}/thanh-toan-that-bai?status=invalid_signature")
 
 @router.get("/chi-tiet-san-pham/{ma_san_pham}", response_model=SanPhamSchema)
 def lay_chi_tiet_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
@@ -658,7 +699,7 @@ def lich_su_mua_hang(
     current_user: NguoiDung = Depends(phan_quyen(khach_hang)),
     db: Session = Depends(get_db)
 ):
-    don_hangs = db.query(DonHang).filter(DonHang.ma_nguoi_dung == current_user.ma_nguoi_dung).all()
+    don_hangs = db.query(DonHang).filter(DonHang.ma_nguoi_dung == current_user.ma_nguoi_dung).order_by(desc(DonHang.ngay_dat)).all()
     if not don_hangs:
         return error_response(message="Bạn chưa có đơn hàng nào")
     result = []
@@ -743,7 +784,7 @@ def so_san_pham_trong_gio_hang(currents_user: NguoiDung = Depends(lay_nguoi_dung
 
 @router.get("/danh-gia/san-pham/{ma_san_pham}")
 def lay_danh_gia_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
-    danh_gias = db.query(DanhGia).filter(DanhGia.ma_san_pham == ma_san_pham).all()
+    danh_gias = db.query(DanhGia).filter(DanhGia.ma_san_pham == ma_san_pham, DanhGia.trang_thai == "DA_DUYET").all()
 
     total = len(danh_gias)
     if not danh_gias:
@@ -768,7 +809,7 @@ def lay_danh_gia_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
 
 @router.get("/danh-sach-khuyen-mai")
 def lay_danh_sach_khuyen_mai(db: Session = Depends(get_db)):
-    khuyen_mais = db.query(KhuyenMai).filter(KhuyenMai.ngay_ket_thuc > datetime.now()).all()
+    khuyen_mais = db.query(KhuyenMai).filter(KhuyenMai.ngay_ket_thuc > datetime.now(), KhuyenMai.trang_thai == "DA_DUYET").all()
     result = []
     for km in khuyen_mais:
         result.append({
@@ -915,7 +956,8 @@ def create_bulk_orders(payload: dict, db: Session = Depends(get_db)):
                 ChiTietDonHang(
                     ma_san_pham=item["ma_san_pham"],
                     so_luong=item["so_luong"],
-                    gia_tien=san_pham.don_gia
+                    gia_goc=san_pham.don_gia,
+                    gia_sau_giam=san_pham.don_gia
                 )
             )
 
@@ -926,7 +968,9 @@ def create_bulk_orders(payload: dict, db: Session = Depends(get_db)):
             dia_chi=order["dia_chi"],
             so_dien_thoai=order["so_dien_thoai"],
             ma_chi_nhanh=order["ma_chi_nhanh"],
-            tong_tien=tong_tien
+            ngay_dat=order["ngay_dat"],
+            tong_tien=tong_tien,
+            tien_giam= 0
         )
 
         db.add(new_order)
@@ -1016,3 +1060,39 @@ def generate_bulk_reviews(db: Session, so_danh_gia_moi_nguoi: int = 3):
 @router.post("/generate/danh-gia")
 def tao_danh_gia_hang_loat(request: BulkReviewRequest, db: Session = Depends(get_db)):
     return generate_bulk_reviews(db, request.so_danh_gia_moi_nguoi)
+
+@router.post("/seed-ton-kho-mau")
+def seed_ton_kho(db: Session = Depends(get_db)):
+    # 1. Lấy tất cả sản phẩm và tất cả chi nhánh
+    tat_ca_san_pham = db.query(SanPham).all()
+    tat_ca_chi_nhanh = db.query(ChiNhanh).all()
+    
+    if not tat_ca_chi_nhanh:
+        return error_response(message="Chưa có chi nhánh nào trong hệ thống")
+
+    count = 0
+    for sp in tat_ca_san_pham:
+        for cn in tat_ca_chi_nhanh:
+            # 2. Kiểm tra xem sản phẩm đã có trong chi nhánh này chưa (tránh lỗi duplicate)
+            ton_kho_ton_tai = db.query(TonKho).filter(
+                TonKho.ma_san_pham == sp.ma_san_pham,
+                TonKho.ma_chi_nhanh == cn.ma_chi_nhanh
+            ).first()
+
+            if not ton_kho_ton_tai:
+                # 3. Tạo dữ liệu tồn kho mẫu (ví dụ mặc định là 100 đơn vị)
+                moi = TonKho(
+                    ma_san_pham=sp.ma_san_pham,
+                    ma_chi_nhanh=cn.ma_chi_nhanh,
+                    so_luong_ton=100  # Bạn có thể dùng random.randint(10, 100) nếu muốn số ngẫu nhiên
+                )
+                db.add(moi)
+                count += 1
+    
+    # 4. Lưu tất cả thay đổi vào DB
+    db.commit()
+
+    return success_response(
+        data = count,
+        message=f"Đã tạo thành công {count} bản ghi tồn kho mẫu cho {len(tat_ca_san_pham)} sản phẩm trên {len(tat_ca_chi_nhanh)} chi nhánh."
+    )

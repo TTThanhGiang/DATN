@@ -12,12 +12,12 @@ Base = declarative_base()
 # =========================
 # ENUMS
 # =========================
-gioi_tinh_enum = Enum("NAM", "NU", "KHAC", name="gioi_tinh", create_type=False)
-vai_tro_enum = Enum("KHACH_HANG", "NHAN_VIEN", "QUAN_LY", "QUAN_TRI_VIEN", name="vai_tro", create_type=False)
-trang_thai_don_hang_enum = Enum("CHO_XU_LY", "DA_XU_LY", "DA_HUY", "HOAN_THANH", name="trang_thai_don_hang", create_type=False)
-trang_thai_thanh_toan_enum = Enum("DA_THANH_TOAN", "CHUA_THANH_TOAN", name="trang_thai_don_hang", create_type=False)
-trang_thai_yeu_cau_enum = Enum("CHO_XU_LY", "DA_DUYET", "DA_HUY", name="trang_thai_yeu_cau", create_type=False)
-trang_thai_khuyen_mai = Enum("CHO_XU_LY", "DA_DUYET", "DA_HUY", name="trang_thai_khuyen_mai", create_type=False)
+gioi_tinh_enum = Enum("NAM", "NU", "KHAC", name="gioi_tinh", create_type=True)
+vai_tro_enum = Enum("KHACH_HANG", "NHAN_VIEN", "QUAN_LY", "QUAN_TRI_VIEN", name="vai_tro", create_type=True)
+trang_thai_don_hang_enum = Enum("CHO_XU_LY", "DA_XU_LY", "DA_HUY", "HOAN_THANH",name="trang_thai_don_hang",create_type=True)
+trang_thai_thanh_toan_enum = Enum("DA_THANH_TOAN", "CHUA_THANH_TOAN",name="trang_thai_thanh_toan",create_type=True)
+trang_thai_yeu_cau_enum = Enum("CHO_XU_LY", "DA_DUYET", "DA_HUY",name="trang_thai_yeu_cau",create_type=True)
+trang_thai_khuyen_mai_enum = Enum("CHO_XU_LY", "DA_DUYET", "DA_HUY",name="trang_thai_khuyen_mai",create_type=True)
 
 # =========================
 # DANH MỤC SẢN PHẨM
@@ -28,29 +28,38 @@ class DanhMucSanPham(Base):
     ma_danh_muc = Column(Integer, primary_key=True, autoincrement=True)
     ten_danh_muc = Column(String(100), nullable=False, unique=True, index=True)
     mo_ta = Column(Text)
-    danh_muc_cha = Column(Integer, ForeignKey("danh_muc_san_pham.ma_danh_muc"))
 
-    # 1. Mối quan hệ trỏ đến Danh mục Cha (Chỉ 1 đối tượng)
-    # primaryjoin: Khóa ngoại của hàng hiện tại (danh_muc_cha) = khóa chính của đối tượng cha (ma_danh_muc)
+    danh_muc_cha = Column(
+        Integer,
+        ForeignKey("danh_muc_san_pham.ma_danh_muc", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    # Cha (1)
     danh_muc_cha_obj = relationship(
         "DanhMucSanPham",
-        remote_side=[ma_danh_muc], 
-        primaryjoin=danh_muc_cha == ma_danh_muc, # Định nghĩa rõ ràng
-        uselist=False # Chỉ có một đối tượng cha
+        remote_side=[ma_danh_muc],
+        back_populates="danh_muc_con"
     )
 
-    # 2. Mối quan hệ trỏ đến Danh sách Danh mục Con (Nhiều đối tượng)
-    # primaryjoin: Khóa ngoại của đối tượng con (danh_muc_cha) = khóa chính của đối tượng hiện tại (ma_danh_muc)
+    # Con (N)
     danh_muc_con = relationship(
         "DanhMucSanPham",
-        remote_side=[danh_muc_cha], # <-- SỬA ĐIỂM NÀY
-        primaryjoin=ma_danh_muc == danh_muc_cha, # Định nghĩa rõ ràng
-        uselist=True, # Luôn là một list
-        lazy="joined"
-        # BỎ backref="danh_muc_cha_rel" để tránh xung đột
+        back_populates="danh_muc_cha_obj",
+        cascade="all, delete-orphan"
     )
-    san_phams = relationship("SanPham", back_populates="danh_muc", cascade="all, delete-orphan")
-    hinh_anhs = relationship("HinhAnh", back_populates="danh_muc", cascade="all, delete-orphan")
+
+    san_phams = relationship(
+        "SanPham",
+        back_populates="danh_muc",
+        cascade="all, delete-orphan"
+    )
+
+    hinh_anhs = relationship(
+        "HinhAnh",
+        back_populates="danh_muc",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<DanhMucSanPham(ma={self.ma_danh_muc}, ten='{self.ten_danh_muc}')>"

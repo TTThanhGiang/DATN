@@ -3,15 +3,12 @@ import json
 from typing  import List
 from typing import Optional
 import os
-from unittest import result
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.encoders import jsonable_encoder
-from fastapi.staticfiles import StaticFiles
 from api.schemas import DonHangOut, DonHangOutAdmin, HinhAnhItem, HuyDonInput, KhuyenMaiCreate, KhuyenMaiOut, NguoiDungCreate, NhanVienCreate, SanPhamDonHangOut, SanPhamKMItem, SanPhamKMItemOut, SanPhamLichSuDonHangOut, SanPhamYeuCauOut, TonKhoCreate, TonKhoUpdate, YeuCauNhapHangCreate, YeuCauNhapHangOut, YeuCauNhapHangUpdate
 from api.routers.admin import tinh_khoang_so_sanh
-from sqlalchemy import desc, func, distinct, and_, cast, Date, or_
-from sqlalchemy.orm import Session, joinedload, load_only
-from dateutil.relativedelta import relativedelta
+from sqlalchemy import desc, func, distinct, cast, Date, or_
+from sqlalchemy.orm import Session
 
 from api.database import get_db, SessionLocal
 from api.models import ChiNhanh, ChiTietDonHang, DonHang, KhuyenMai, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, SanPhamKhuyenMai, SanPhamYeuCau, TonKho, YeuCauNhapHang
@@ -66,9 +63,14 @@ async def them_nhan_vien(
     db: Session = Depends(get_db)
 ):
     ma_chi_nhanh = currents_user.ma_chi_nhanh
-    if db.query(NguoiDung).filter((NguoiDung.so_dien_thoai == nguoidung.so_dien_thoai) | (NguoiDung.email == nguoidung.email)).first():
-        return error_response(
-            message="Người dùng đã tồn tại"
+    ton_tai = db.query(NguoiDung).filter(
+        (NguoiDung.so_dien_thoai == nguoidung.so_dien_thoai) | 
+        (NguoiDung.email == nguoidung.email)
+    ).first()
+    if ton_tai:
+        raise HTTPException(
+            status_code=400, 
+            detail="Số điện thoại hoặc Email đã tồn tại trên hệ thống"
         )
     
     mat_khau_da_ma_hoa = ma_hoa_mat_khau(nguoidung.mat_khau)

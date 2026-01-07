@@ -3,14 +3,11 @@ import json
 from pydoc import text
 from typing import List, Optional
 import os
-from unittest import result
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, UploadFile, File
 from fastapi.encoders import jsonable_encoder
-from fastapi.staticfiles import StaticFiles
 from api.schemas import DonHangOut, DonHangOutAdmin, HinhAnhItem, HuyDonInput, KhuyenMaiAdminOut, KhuyenMaiOut, NguoiDungCreate, SanPhamDonHangOut, SanPhamKMItem, SanPhamKMItemOut, SanPhamLichSuDonHangOut, SanPhamYeuCauOut, TonKhoCreate, TonKhoManyCreate, TonKhoUpdate, TuChoiYeuCau, YeuCauNhapHangOut
-from sqlalchemy import desc, func, distinct, and_, cast, Date, or_
-from sqlalchemy.orm import Session, joinedload, load_only
-from dateutil.relativedelta import relativedelta
+from sqlalchemy import desc, func, distinct, cast, Date, or_
+from sqlalchemy.orm import Session
 
 from api.database import get_db, SessionLocal
 from api.models import ChiNhanh, DanhGia, KhuyenMai, SanPham, DanhMucSanPham, HinhAnh, NguoiDung, SanPhamKhuyenMai, TonKho, YeuCauNhapHang, DonHang, ChiTietDonHang
@@ -19,13 +16,9 @@ from api.utils.response_helpers import success_response, error_response
 
 router = APIRouter(prefix="/admins", tags=["Quản trị viên"])
 
-# Thư mục lưu ảnh
 UPLOAD_DIR_SANPHAM = "uploads/sanphams"
 UPLOAD_DIR_DANHMUC = "uploads/danhmucs"
 UPLOAD_DIR_KHUYENMAI = "uploads/khuyenmais"
-
-# Mount thư mục mẹ ở app chính
-# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 admin = "QUAN_TRI_VIEN"
 # ------------------ SẢN PHẨM ------------------
@@ -482,9 +475,15 @@ async def them_nguoi_dung(
     currents_user: NguoiDung = Depends(phan_quyen(admin)),
     db: Session = Depends(get_db)
 ):
-    if db.query(NguoiDung).filter((NguoiDung.so_dien_thoai == nguoidung.so_dien_thoai) | (NguoiDung.email == nguoidung.email)).first():
-        return error_response(
-            message="Người dùng đã tồn tại"
+    
+    ton_tai = db.query(NguoiDung).filter(
+        (NguoiDung.so_dien_thoai == nguoidung.so_dien_thoai) | 
+        (NguoiDung.email == nguoidung.email)
+    ).first()
+    if ton_tai:
+        raise HTTPException(
+            status_code=400, 
+            detail="Số điện thoại hoặc Email đã tồn tại trên hệ thống"
         )
     
     mat_khau_da_ma_hoa = ma_hoa_mat_khau(nguoidung.mat_khau)
@@ -928,10 +927,10 @@ async def tao_khuyen_mai(
 ):
     exits_ma_code = db.query(KhuyenMai).filter(KhuyenMai.ma_code == ma_code).first()
     if exits_ma_code:
-        return error_response(message="Mã khuyến mãi đã tồn tại")
-    
+        raise HTTPException(status_code=400, detail="Mã khuyến mãi đã tồn tại")
+
     if ngay_ket_thuc < ngay_bat_dau:
-        return error_response(message="ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu")
+        raise HTTPException(status_code=400, detail="Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu")
     
     khuyen_mai = KhuyenMai(
         ten_khuyen_mai = ten_khuyen_mai,
@@ -1063,6 +1062,92 @@ def tu_choi_khuyen_mai(
     db.refresh(khuyen_mai)
 
     return {"success": True, "message": "Đã từ chối khuyến mãi"}
+
+@router.put("/cap-nhat-khuyen-mai/{ma_khuyen_mai}")
+async def cap_nhat_khuyen_mai(
+    ma_khuyen_mai: int,
+    ten_khuyen_mai: Optional[str] = Form(None),
+    ma_code: Optional[str] = Form(None),
+    mo_ta: Optional[str] = Form(None),
+    giam_gia: Optional[float] = Form(None),
+    ngay_bat_dau: Optional[datetime] = Form(None),
+    ngay_ket_thuc: Optional[datetime] = Form(None),
+    san_phams: Optional[str] = Form(None),  # JSON string
+    hinh_anh: Optional[UploadFile] = File(None),
+    currents_user: NguoiDung = Depends(lay_nguoi_dung_hien_tai),
+    db: Session = Depends(get_db)
+):
+    km = db.query(KhuyenMai).filter(
+        KhuyenMai.ma_khuyen_mai == ma_khuyen_mai
+    ).first()
+
+    if not km:
+        return error_response(message="Không tìm thấy khuyến mãi")
+    if ma_code and ma_code != km.ma_code:
+        exists = db.query(KhuyenMai).filter(KhuyenMai.ma_code == ma_code).first()
+        if exists:
+            return error_response(message="Mã khuyến mãi đã tồn tại")
+
+    if ngay_bat_dau and ngay_ket_thuc:
+        if ngay_ket_thuc < ngay_bat_dau:
+            return error_response(message="Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu")
+
+    if ten_khuyen_mai is not None:
+        km.ten_khuyen_mai = ten_khuyen_mai
+    if ma_code is not None:
+        km.ma_code = ma_code
+    if mo_ta is not None:
+        km.mo_ta = mo_ta
+    if giam_gia is not None:
+        km.giam_gia = giam_gia
+    if ngay_bat_dau is not None:
+        km.ngay_bat_dau = ngay_bat_dau
+    if ngay_ket_thuc is not None:
+        km.ngay_ket_thuc = ngay_ket_thuc
+
+    if hinh_anh is not None and hinh_anh.filename:
+        os.makedirs(UPLOAD_DIR_KHUYENMAI, exist_ok=True)
+        file_path = os.path.join(UPLOAD_DIR_KHUYENMAI, hinh_anh.filename)
+
+        with open(file_path, "wb") as f:
+            f.write(await hinh_anh.read())
+
+        file_url = f"http://localhost:8000/{file_path}"
+
+        db.query(HinhAnh).filter(HinhAnh.ma_khuyen_mai == ma_khuyen_mai).delete()
+
+        ha = HinhAnh(
+            ma_khuyen_mai=ma_khuyen_mai,
+            duong_dan=file_url,
+            mo_ta=km.ten_khuyen_mai
+        )
+        db.add(ha)
+
+    if san_phams is not None:
+        db.query(SanPhamKhuyenMai).filter(
+            SanPhamKhuyenMai.ma_khuyen_mai == ma_khuyen_mai
+        ).delete()
+        try:
+            san_pham_list = [SanPhamKMItem(**item) for item in json.loads(san_phams)]
+        except:
+            return error_response(message="Danh sách sản phẩm không hợp lệ")
+        for sp in san_pham_list:
+            db.add(
+                SanPhamKhuyenMai(
+                    ma_khuyen_mai=ma_khuyen_mai,
+                    ma_san_pham=sp.ma_san_pham,
+                    so_luong=sp.so_luong
+                )
+            )
+
+    db.commit()
+    db.refresh(km)
+
+    return success_response(
+        data=jsonable_encoder(km),
+        message="Cập nhật khuyến mãi thành công"
+    )
+
 # ------------------ ĐÁNH GIÁ -------------------
 
 @router.get("/danh-sach-danh-gia")
@@ -1177,393 +1262,27 @@ def tinh_khoang_so_sanh(tu_ngay: datetime, den_ngay: datetime, kieu_so_sanh: str
 
     return tu_truoc, den_truoc, label
 
-# # @router.get("/don-hang")
-# # def lay_danh_sach_don_hang(
-# #     db: Session = Depends(get_db),
-# #     # Các tham số lọc
-# #     ma_chi_nhanh: Optional[int] = Query(None, description="Lọc theo mã chi nhánh"),
-# #     tu_ngay: Optional[datetime] = Query(None, description="Lọc từ ngày (YYYY-MM-DD)"),
-# #     den_ngay: Optional[datetime] = Query(None, description="Lọc đến ngày (YYYY-MM-DD)"),
-# #     ten_khach_hang: Optional[str] = Query(None, description="Tìm theo tên khách hàng"),
-# #     so_dien_thoai: Optional[str] = Query(None, description="Tìm theo số điện thoại"),
-# #     ten_san_pham: Optional[str] = Query(None, description="Lọc đơn hàng có chứa sản phẩm này")
-# # ):
-# #     # Khởi tạo query và join các bảng cần thiết để lọc
-# #     query = db.query(DonHang).join(DonHang.chi_tiet_don_hangs).join(ChiTietDonHang.san_pham)
-    
-# #     bo_loc = []
-
-# #     # 1. Lọc theo chi nhánh
-# #     if ma_chi_nhanh:
-# #         bo_loc.append(DonHang.ma_chi_nhanh == ma_chi_nhanh)
-
-# #     # 2. Lọc theo khoảng thời gian
-# #     if tu_ngay:
-# #         bo_loc.append(DonHang.ngay_dat >= tu_ngay)
-# #     if den_ngay:
-# #         bo_loc.append(DonHang.ngay_dat <= den_ngay)
-
-# #     # 3. Tìm theo tên khách hàng (không dấu hoặc có dấu tùy cấu hình DB)
-# #     if ten_khach_hang:
-# #         bo_loc.append(DonHang.ho_ten.ilike(f"%{ten_khach_hang}%"))
-
-# #     # 4. Tìm theo số điện thoại
-# #     if so_dien_thoai:
-# #         bo_loc.append(DonHang.so_dien_thoai.contains(so_dien_thoai))
-# #     if ten_san_pham:
-# #         bo_loc.append(SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%"))
-
-# #     # Thực thi query với bộ lọc
-# #     if bo_loc:
-# #         query = query.filter(and_(*bo_loc))
-# #     ket_qua = (
-# #         query.options(
-# #             # Từ bảng Đơn Hàng chỉ lấy các cột này
-# #             load_only(DonHang.ma_don_hang, DonHang.tong_tien, DonHang.ngay_dat, DonHang.ma_chi_nhanh),
-            
-# #             # Load sâu vào Chi Tiết và chỉ lấy Số lượng, Giá
-# #             joinedload(DonHang.chi_tiet_don_hangs).options(
-# #                 load_only(ChiTietDonHang.so_luong, ChiTietDonHang.gia_tien, ChiTietDonHang.ma_san_pham),
-                
-# #                 # Load sâu vào Sản Phẩm và chỉ lấy Tên + Hình ảnh
-# #                 joinedload(ChiTietDonHang.san_pham).options(
-# #                     load_only(SanPham.ten_san_pham),
-# #                     joinedload(SanPham.hinh_anhs).load_only(HinhAnh.duong_dan) # Giả sử bảng hình ảnh có cột url
-# #                 )
-# #             ),
-# #             # Load tên chi nhánh
-# #             joinedload(DonHang.chi_nhanh).load_only(ChiNhanh.ten_chi_nhanh)
-# #         )
-# #         .distinct()
-# #         .all()
-# #     )
-
-# #     return ket_qua
-
-# def query_tong_quan(db: Session, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham):
-#     query = db.query(
-#         func.coalesce(func.sum(DonHang.tong_tien), 0).label("doanh_thu"),
-#         func.count(distinct(DonHang.ma_don_hang)).label("so_don"),
-#         func.count(distinct(DonHang.ma_nguoi_dung)).label("khach_hang")
-#     ).select_from(DonHang)
-
-#     # Quan trọng: Sử dụng outerjoin để tránh mất dữ liệu DonHang nếu lọc theo tên SP
-#     if ten_san_pham:
-#         query = (
-#             query
-#             .outerjoin(ChiTietDonHang, ChiTietDonHang.ma_don_hang == DonHang.ma_don_hang)
-#             .outerjoin(SanPham, SanPham.ma_san_pham == ChiTietDonHang.ma_san_pham)
-#             .filter(SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%"))
-#         )
-
-#     if ma_chi_nhanh:
-#         query = query.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
-#     if tu_ngay:
-#         query = query.filter(DonHang.ngay_dat >= tu_ngay)
-#     if den_ngay:
-#         query = query.filter(DonHang.ngay_dat <= den_ngay)
-
-#     return query.first()
-
-# def query_top_san_pham(db: Session, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham, limit=None):
-#     # Tính doanh thu bằng cách ưu tiên gia_sau_giam, nếu không có thì lấy gia_goc
-#     doanh_thu_tinh_toan = func.sum(
-#         ChiTietDonHang.so_luong * func.coalesce(ChiTietDonHang.gia_sau_giam, ChiTietDonHang.gia_goc)
-#     )
-
-#     query = (
-#         db.query(
-#             SanPham.ma_san_pham.label("id"),
-#             SanPham.ten_san_pham.label("ten"),
-#             func.coalesce(func.sum(ChiTietDonHang.so_luong), 0).label("so_luong"),
-#             func.coalesce(doanh_thu_tinh_toan, 0).label("doanh_thu"),
-#             func.min(HinhAnh.duong_dan).label("hinh_anh")
-#         )
-#         .outerjoin(ChiTietDonHang, ChiTietDonHang.ma_san_pham == SanPham.ma_san_pham)
-#         .outerjoin(DonHang, DonHang.ma_don_hang == ChiTietDonHang.ma_don_hang)
-#         .outerjoin(HinhAnh, HinhAnh.ma_san_pham == SanPham.ma_san_pham)
-#     )
-
-#     if tu_ngay: query = query.filter(DonHang.ngay_dat >= tu_ngay)
-#     if den_ngay: query = query.filter(DonHang.ngay_dat <= den_ngay)
-#     if ten_san_pham: query = query.filter(SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%"))
-#     if ma_chi_nhanh: query = query.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
-
-#     final_query = query.group_by(SanPham.ma_san_pham, SanPham.ten_san_pham).order_by(desc("doanh_thu"))
-#     if limit: final_query = final_query.limit(limit)
-#     return final_query.all()
-# @router.get("/tong-quan")
-# def dashboard_tong_quan(
-#     db: Session = Depends(get_db),
-#     ma_chi_nhanh: Optional[int] = Query(None),
-#     tu_ngay: Optional[datetime] = Query(None),
-#     den_ngay: Optional[datetime] = Query(None),
-#     ten_san_pham: Optional[str]  = Query(None),
-#     kieu_so_sanh: Optional[str] = Query("7_ngay")   
-# ):
-#     # 1. ===== XỬ LÝ KỲ TRƯỚC =====
-#     # Lấy khoảng ngày và mô tả text trước khi query
-#     if den_ngay:
-#         den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
-#     tu_truoc, den_truoc, mo_ta_so_sanh = tinh_khoang_so_sanh(
-#         tu_ngay, den_ngay, kieu_so_sanh
-#     )
-
-#     # 2. ===== QUERY DỮ LIỆU =====
-#     # Query kỳ hiện tại
-#     hien_tai = query_tong_quan(db, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham)
-
-#     # Query kỳ trước (nếu có)
-#     ky_truoc_data = None
-#     if tu_truoc and den_truoc:
-#         ky_truoc_data = query_tong_quan(db, ma_chi_nhanh, tu_truoc, den_truoc, ten_san_pham)
-
-#     # 3. ===== TÍNH TOÁN TỶ LỆ TĂNG TRƯỞNG (%) =====
-#     def tinh_pct(hien_tai_val, truoc_val):
-#         val_ht = hien_tai_val or 0
-#         val_tr = truoc_val or 0
-#         if val_tr == 0:
-#             return 100 if val_ht > 0 else 0
-#         return round((val_ht - val_tr) / val_tr * 100, 2)
-
-#     # Chuẩn bị dữ liệu kỳ trước để so sánh
-#     kt_doanh_thu = ky_truoc_data.doanh_thu if ky_truoc_data else 0
-#     kt_so_don = ky_truoc_data.so_don if ky_truoc_data else 0
-#     kt_khach_hang = ky_truoc_data.khach_hang if ky_truoc_data else 0
-
-#     return {
-#         "bo_loc": {
-#             "ma_chi_nhanh": ma_chi_nhanh,
-#             "tu_ngay": tu_ngay,
-#             "den_ngay": den_ngay,
-#             "kieu_so_sanh": kieu_so_sanh,
-#             "mo_ta_so_sanh": mo_ta_so_sanh
-#         },
-#         "hien_tai": {
-#             "doanh_thu": hien_tai.doanh_thu or 0,
-#             "so_don": hien_tai.so_don or 0,
-#             "khach_hang": hien_tai.khach_hang or 0
-#         },
-#         "so_sanh": {
-#             "doanh_thu_pct": tinh_pct(hien_tai.doanh_thu, kt_doanh_thu),
-#             "so_don_pct": tinh_pct(hien_tai.so_don, kt_so_don),
-#             "khach_hang_pct": tinh_pct(hien_tai.khach_hang, kt_khach_hang)
-#         }
-#     }
-
-# def query_top_san_pham(
-#     db: Session,
-#     ma_chi_nhanh: Optional[int],
-#     tu_ngay: datetime,
-#     den_ngay: datetime,
-#     ten_san_pham: str,
-#     limit: int = None 
-# ):
-#     query = (
-#         db.query(
-#             SanPham.ma_san_pham.label("id"),
-#             SanPham.ten_san_pham.label("ten"),
-#             func.coalesce(func.sum(ChiTietDonHang.so_luong), 0).label("so_luong"),
-#             func.coalesce(func.sum(ChiTietDonHang.so_luong * func.coalesce(ChiTietDonHang.gia_sau_giam, ChiTietDonHang.gia_goc)), 0).label("doanh_thu"),
-#             func.min(HinhAnh.duong_dan).label("hinh_anh")
-#         )
-#         .outerjoin(ChiTietDonHang, ChiTietDonHang.ma_san_pham == SanPham.ma_san_pham)
-#         .outerjoin(DonHang, DonHang.ma_don_hang == ChiTietDonHang.ma_don_hang)
-#         .outerjoin(HinhAnh, HinhAnh.ma_san_pham == SanPham.ma_san_pham)
-#     )
-#     if tu_ngay:
-#         query = query.filter(DonHang.ngay_dat >= tu_ngay)
-
-#     if den_ngay:
-#         query = query.filter(DonHang.ngay_dat <= den_ngay)
-
-#     if ten_san_pham:
-#         query = query.filter(
-#             SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%")
-#         )
-
-#     if ma_chi_nhanh:
-#         query = query.filter((DonHang.ma_chi_nhanh == ma_chi_nhanh) | (DonHang.ma_chi_nhanh == None))
-
-#     final_query = query.group_by(SanPham.ma_san_pham, SanPham.ten_san_pham).order_by(desc("doanh_thu"))
-
-#     if limit:
-#         final_query = final_query.limit(limit)
-
-#     return final_query.all()
-
-# @router.get("/tong-quan/top-san-pham")
-# def get_top_san_pham(
-#     db: Session = Depends(get_db),
-#     ma_chi_nhanh: Optional[int] = Query(None),
-#     tu_ngay: Optional[datetime] = Query(None),
-#     den_ngay: Optional[datetime] = Query(None),
-#     kieu_so_sanh: Optional[str] = Query("7_ngay"),
-#     ten_san_pham: Optional[str]  = Query(None),
-# ):
-#     if den_ngay:
-#         den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
-#     tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
-
-#     top_hien_tai = query_top_san_pham(db, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham)
-#     doanh_thu_truoc_map = {}
-#     if tu_truoc and den_truoc:
-#         top_truoc = query_top_san_pham(db, ma_chi_nhanh, tu_truoc, den_truoc, ten_san_pham, limit=100)
-#         doanh_thu_truoc_map = {item.id: item.doanh_thu for item in top_truoc}
-
-#     ket_qua = []
-#     for sp in top_hien_tai:
-#         dt_ht = sp.doanh_thu or 0
-#         dt_tr = doanh_thu_truoc_map.get(sp.id, 0)
-        
-#         if dt_tr > 0:
-#             phan_tram = round((dt_ht - dt_tr) / dt_tr * 100, 2)
-#         else:
-#             phan_tram = 100.0 if dt_ht > 0 else 0.0
-
-#         ket_qua.append({
-#             "id": sp.id,
-#             "ten": sp.ten,
-#             "hinh_anh": sp.hinh_anh,
-#             "doanh_thu": dt_ht,
-#             "so_luong": sp.so_luong,
-#             "phan_tram_tang_truong": phan_tram,
-#             "ky_truoc_doanh_thu": dt_tr
-#         })
-
-#     return ket_qua
-
-# def query_hieu_suat(
-#     db: Session,
-#     tu_ngay: datetime,
-#     den_ngay: datetime
-# ):
-#     # Query cơ bản lấy thông tin chi nhánh và doanh số
-#     return (
-#         db.query(
-#             ChiNhanh.ma_chi_nhanh.label("id"),
-#             ChiNhanh.ten_chi_nhanh.label("ten"),
-#             func.count(DonHang.ma_don_hang).label("so_don"),
-#             func.coalesce(func.sum(DonHang.tong_tien), 0).label("doanh_thu")
-#         )
-#         .outerjoin(DonHang, (DonHang.ma_chi_nhanh == ChiNhanh.ma_chi_nhanh) & 
-#                            (DonHang.ngay_dat >= tu_ngay) & 
-#                            (DonHang.ngay_dat <= den_ngay))
-#         .group_by(ChiNhanh.ma_chi_nhanh)
-#         .all()
-#     )
-
-# @router.get("/tong-quan/hieu-suat-chi-nhanh")
-# def hieu_suat_chi_nhanh(
-#     db: Session = Depends(get_db),
-#     tu_ngay: Optional[datetime] = Query(None),
-#     den_ngay: Optional[datetime] = Query(None),
-#     kieu_so_sanh: Optional[str] = Query(
-#         "7_ngay",
-#         description="1_ngay, 7_ngay, 30_ngay, 90_ngay, thang_truoc, nam_truoc"
-#     )
-# ):
-#     # 1. Lấy dữ liệu kỳ hiện tại
-#     hien_tai = query_hieu_suat(db, tu_ngay, den_ngay)
-
-#     # 2. Tính toán kỳ trước dựa trên func của bạn
-#     tu_truoc, den_truoc, _  = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
-    
-#     # 3. Lấy dữ liệu kỳ trước và map vào dictionary
-#     doanh_thu_truoc_map = {}
-#     if tu_truoc and den_truoc:
-#         truoc = query_hieu_suat(db, tu_truoc, den_truoc)
-#         doanh_thu_truoc_map = {item.id: item.doanh_thu for item in truoc}
-
-#     # 4. Tổng hợp kết quả và tính % tăng trưởng
-#     ket_qua = []
-#     for cn in hien_tai:
-#         dt_ht = cn.doanh_thu
-#         dt_tr = doanh_thu_truoc_map.get(cn.id, 0)
-        
-#         phan_tram = None
-#         if dt_tr > 0:
-#             phan_tram = round((dt_ht - dt_tr) / dt_tr * 100, 2)
-#         elif dt_ht > 0:
-#             phan_tram = 100.0 # Tăng trưởng tuyệt đối nếu kỳ trước không có doanh thu
-
-#         ket_qua.append({
-#             "ten": cn.ten,
-#             "don_hang": cn.so_don,
-#             "doanh_thu": dt_ht,
-#             "phan_tram_tang_truong": phan_tram
-#         })
-
-#     # Sắp xếp theo doanh thu giảm dần
-#     return sorted(ket_qua, key=lambda x: x['doanh_thu'], reverse=True)
-
-# @router.get("/tong-quan/bieu-do-so-sanh")
-# def bieu_do_so_sanh(
-#     db: Session = Depends(get_db),
-#     ma_chi_nhanh: Optional[int] = Query(None),
-#     tu_ngay: datetime = Query(...),
-#     den_ngay: datetime = Query(...),
-#     kieu_so_sanh: str = Query("7_ngay")
-# ):
-#     if den_ngay:
-#         den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
-#     tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
-
-#     def get_full_data(start, end):
-#         if not start or not end: return []
-        
-#         # 1. Lấy dữ liệu thực tế từ DB
-#         results = db.query(
-#             cast(DonHang.ngay_dat, Date).label("ngay"),
-#             func.sum(DonHang.tong_tien).label("total")
-#         ).filter(
-#             DonHang.ngay_dat >= start, 
-#             DonHang.ngay_dat <= f"{end.date()} 23:59:59"
-#         )
-#         if ma_chi_nhanh and ma_chi_nhanh != "Tất cả":
-#             results = results.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
-        
-#         db_data = {r.ngay: float(r.total or 0) for r in results.group_by(cast(DonHang.ngay_dat, Date)).all()}
-
-#         # 2. Tạo danh sách ĐẦY ĐỦ các ngày từ start đến end
-#         full_series = []
-#         current_date = start.date()
-#         while current_date <= end.date():
-#             full_series.append({
-#                 "label": current_date.strftime("%d/%m"),
-#                 "value": db_data.get(current_date, 0) # Nếu DB không có ngày này, gán = 0
-#             })
-#             current_date += timedelta(days=1)
-#         return full_series
-
-#     hien_tai_full = get_full_data(tu_ngay, den_ngay)
-    
-#     # Đối với kỳ trước, chúng ta cũng cần tạo đủ số lượng điểm tương ứng với kỳ hiện tại
-#     # Tuy nhiên, để biểu đồ MUI vẽ đè lên nhau được, 2 mảng data phải có ĐỘ DÀI BẰNG NHAU.
-#     ky_truoc_full = get_full_data(tu_truoc, den_truoc) if tu_truoc else []
-
-#     return {
-#         "labels": [d["label"] for d in hien_tai_full],
-#         "data_hien_tai": [d["value"] for d in hien_tai_full],
-#         "data_ky_truoc": [d["value"] for d in ky_truoc_full][:len(hien_tai_full)] # Cắt bằng độ dài kỳ hiện tại
-#     }
-
-
 def query_tong_quan(db: Session, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham):
-    query = db.query(
-        func.coalesce(func.sum(DonHang.tong_tien), 0).label("doanh_thu"),
-        func.count(distinct(DonHang.ma_don_hang)).label("so_don"),
-        func.count(distinct(DonHang.ma_nguoi_dung)).label("khach_hang")
-    ).select_from(DonHang)
-
-    # Dùng OUTER JOIN để nếu lọc SP không thấy thì vẫn trả về 0 thay vì None
     if ten_san_pham:
-        query = (
-            query
-            .outerjoin(ChiTietDonHang, ChiTietDonHang.ma_don_hang == DonHang.ma_don_hang)
-            .outerjoin(SanPham, SanPham.ma_san_pham == ChiTietDonHang.ma_san_pham)
-            .filter(SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%"))
+        query = db.query(
+            func.coalesce(
+                func.sum(ChiTietDonHang.so_luong * ChiTietDonHang.gia_sau_giam), 0
+            ).label("doanh_thu"),
+            func.count(distinct(DonHang.ma_don_hang)).label("so_don"),
+            func.count(distinct(DonHang.ma_nguoi_dung)).label("khach_hang")
+        ).select_from(DonHang).join(
+            ChiTietDonHang, ChiTietDonHang.ma_don_hang == DonHang.ma_don_hang
+        ).join(
+            SanPham, SanPham.ma_san_pham == ChiTietDonHang.ma_san_pham
+        ).filter(
+            SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%")
         )
+    else:
+        query = db.query(
+            func.coalesce(func.sum(DonHang.tong_tien), 0).label("doanh_thu"),
+            func.count(distinct(DonHang.ma_don_hang)).label("so_don"),
+            func.count(distinct(DonHang.ma_nguoi_dung)).label("khach_hang")
+        ).select_from(DonHang)
 
     if ma_chi_nhanh:
         query = query.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
@@ -1575,7 +1294,6 @@ def query_tong_quan(db: Session, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham):
     return query.first()
 
 def query_top_san_pham(db: Session, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham, limit=None):
-    # Tính doanh thu thực tế dựa trên giá sau giảm
     doanh_thu_thuc_te = func.sum(
         ChiTietDonHang.so_luong * func.coalesce(ChiTietDonHang.gia_sau_giam, ChiTietDonHang.gia_goc)
     )
@@ -1647,6 +1365,7 @@ def hieu_suat_chi_nhanh(
     db: Session = Depends(get_db),
     tu_ngay: Optional[datetime] = Query(None),
     den_ngay: Optional[datetime] = Query(None),
+    ten_san_pham: Optional[str] = Query(None),
     kieu_so_sanh: str = "7_ngay"
 ):
     if den_ngay:
@@ -1654,37 +1373,56 @@ def hieu_suat_chi_nhanh(
     
     tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
 
-    hien_tai = (
-        db.query(
+    def get_data_by_period(start_date, end_date, product_name):
+        query = db.query(
             ChiNhanh.ma_chi_nhanh.label("id"),
             ChiNhanh.ten_chi_nhanh.label("ten"),
-            func.count(DonHang.ma_don_hang).label("so_don"),
-            func.coalesce(func.sum(DonHang.tong_tien), 0).label("doanh_thu")
-        )
-        .outerjoin(DonHang, (DonHang.ma_chi_nhanh == ChiNhanh.ma_chi_nhanh) & 
-                           (DonHang.ngay_dat >= tu_ngay) & (DonHang.ngay_dat <= den_ngay))
-        .group_by(ChiNhanh.ma_chi_nhanh).all()
-    )
+            func.count(distinct(DonHang.ma_don_hang)).label("so_don"),
+            func.coalesce(
+                func.sum(ChiTietDonHang.so_luong * ChiTietDonHang.gia_sau_giam) if product_name 
+                else func.sum(DonHang.tong_tien), 0
+            ).label("doanh_thu")
+        ).select_from(ChiNhanh)
 
-    # Query kỳ trước để so sánh
+        join_cond = (DonHang.ma_chi_nhanh == ChiNhanh.ma_chi_nhanh)
+        if start_date:
+            join_cond &= (DonHang.ngay_dat >= start_date)
+        if end_date:
+            join_cond &= (DonHang.ngay_dat <= end_date)
+        
+        join_cond &= (DonHang.trang_thai != "DA_HUY")
+        
+        query = query.outerjoin(DonHang, join_cond)
+
+        if product_name:
+            query = query.join(ChiTietDonHang, ChiTietDonHang.ma_don_hang == DonHang.ma_don_hang)\
+                         .join(SanPham, SanPham.ma_san_pham == ChiTietDonHang.ma_san_pham)\
+                         .filter(SanPham.ten_san_pham.ilike(f"%{product_name}%"))
+        
+        return query.group_by(ChiNhanh.ma_chi_nhanh, ChiNhanh.ten_chi_nhanh).all()
+
+    hien_tai = get_data_by_period(tu_ngay, den_ngay, ten_san_pham)
+
     doanh_thu_truoc_map = {}
     if tu_truoc:
-        truoc = db.query(ChiNhanh.ma_chi_nhanh.label("id"), func.sum(DonHang.tong_tien).label("dt")) \
-                  .join(DonHang).filter(DonHang.ngay_dat >= tu_truoc, DonHang.ngay_dat <= den_truoc) \
-                  .group_by(ChiNhanh.ma_chi_nhanh).all()
-        doanh_thu_truoc_map = {item.id: item.dt for item in truoc}
+        truoc = get_data_by_period(tu_truoc, den_truoc, ten_san_pham)
+        doanh_thu_truoc_map = {item.id: item.doanh_thu for item in truoc}
 
     ket_qua = []
     for cn in hien_tai:
-        dt_ht = cn.doanh_thu or 0
-        dt_tr = doanh_thu_truoc_map.get(cn.id, 0)
+        dt_ht = float(cn.doanh_thu or 0)
+        dt_tr = float(doanh_thu_truoc_map.get(cn.id, 0))
+        if dt_tr == 0:
+            pct = 100.0 if dt_ht > 0 else 0.0
+        else:
+            pct = round((dt_ht - dt_tr) / dt_tr * 100, 2)
+
         ket_qua.append({
             "ten": cn.ten,
             "don_hang": cn.so_don,
             "doanh_thu": dt_ht,
-            "phan_tram_tang_truong": round((dt_ht - dt_tr) / dt_tr * 100, 2) if dt_tr > 0 else (100.0 if dt_ht > 0 else 0)
+            "phan_tram_tang_truong": pct
         })
-
     return sorted(ket_qua, key=lambda x: x['doanh_thu'], reverse=True)
 
 @router.get("/tong-quan/top-san-pham")
@@ -1699,25 +1437,20 @@ def get_top_san_pham_api(
     if den_ngay:
         den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
     
-    # Tính khoảng thời gian kỳ trước (ví dụ: 7 ngày trước đó nữa)
     tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
 
-    # 2. Lấy Top 10 sản phẩm kỳ hiện tại
     top_hien_tai = query_top_san_pham(db, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham, limit=10)
 
-    # 3. Lấy dữ liệu kỳ trước để so sánh (không limit để map đúng ID sản phẩm)
     doanh_thu_truoc_map = {}
     if tu_truoc and den_truoc:
         top_truoc = query_top_san_pham(db, ma_chi_nhanh, tu_truoc, den_truoc, ten_san_pham, limit=100)
         doanh_thu_truoc_map = {item.id: item.doanh_thu for item in top_truoc}
 
-    # 4. Tổng hợp và tính toán % tăng trưởng
     ket_qua = []
     for sp in top_hien_tai:
         dt_ht = sp.doanh_thu or 0
         dt_tr = doanh_thu_truoc_map.get(sp.id, 0)
         
-        # Tính phần trăm tăng trưởng doanh thu
         if dt_tr > 0:
             phan_tram = round((dt_ht - dt_tr) / dt_tr * 100, 2)
         else:
@@ -1741,6 +1474,7 @@ def bieu_do_so_sanh(
     ma_chi_nhanh: Optional[int] = Query(None),
     tu_ngay: datetime = Query(...),
     den_ngay: datetime = Query(...),
+    ten_san_pham: str = Query(None),
     kieu_so_sanh: str = Query("7_ngay")
 ):
   
@@ -1749,41 +1483,49 @@ def bieu_do_so_sanh(
     
     tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
 
-    def get_full_data(start, end):
+    def get_full_data(start, end, ten_san_pham):
         if not start or not end: 
             return []
         end_dt = end.replace(hour=23, minute=59, second=59)
-        results = db.query(
-            cast(DonHang.ngay_dat, Date).label("ngay"),
-            func.coalesce(func.sum(DonHang.tong_tien), 0).label("total")
-        ).filter(
+
+        if ten_san_pham:
+            query = db.query(
+                cast(DonHang.ngay_dat, Date).label("ngay"),
+                func.coalesce(
+                    func.sum(ChiTietDonHang.gia_sau_giam * ChiTietDonHang.so_luong), 0
+                ).label("total")
+            ).join(ChiTietDonHang, DonHang.ma_don_hang == ChiTietDonHang.ma_don_hang)\
+             .join(SanPham, ChiTietDonHang.ma_san_pham == SanPham.ma_san_pham)
+            query = query.filter(SanPham.ten_san_pham.ilike(f"%{ten_san_pham}%"))
+        else:
+            query = db.query(
+                cast(DonHang.ngay_dat, Date).label("ngay"),
+                func.coalesce(func.sum(DonHang.tong_tien), 0).label("total")
+            )
+        query = query.filter(
             DonHang.ngay_dat >= start, 
-            DonHang.ngay_dat <= end_dt
+            DonHang.ngay_dat <= end_dt,
+            DonHang.trang_thai != "DA_HUY"
         )
-        
         if ma_chi_nhanh:
             results = results.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
-        
-        # Chuyển kết quả query thành dictionary {date: value} để lookup nhanh
-        db_data = {r.ngay: float(r.total or 0) for r in results.group_by(cast(DonHang.ngay_dat, Date)).all()}
 
-        # 2. Tạo danh sách ĐẦY ĐỦ các ngày từ start đến end để tránh đứt đoạn biểu đồ
+        results = query.group_by(cast(DonHang.ngay_dat, Date)).all()
+        db_data = {r.ngay: float(r.total or 0) for r in results}
+        
         full_series = []
         current_date = start.date()
         while current_date <= end.date():
             full_series.append({
                 "label": current_date.strftime("%d/%m"),
-                "value": db_data.get(current_date, 0) # Nếu DB không có ngày này, gán = 0
+                "value": db_data.get(current_date, 0)
             })
             current_date += timedelta(days=1)
         return full_series
 
-    # Thực hiện lấy dữ liệu cho kỳ hiện tại và kỳ trước
-    hien_tai_full = get_full_data(tu_ngay, den_ngay)
-    ky_truoc_full = get_full_data(tu_truoc, den_truoc) if tu_truoc else []
+    hien_tai_full = get_full_data(tu_ngay, den_ngay, ten_san_pham)
+    ky_truoc_full = get_full_data(tu_truoc, den_truoc, ten_san_pham) if tu_truoc else []
 
-    # Trả về format dữ liệu chuẩn cho Frontend
-    # Lưu ý: Cắt hoặc bù mảng kỳ trước để có độ dài BẰNG mảng hiện tại giúp MUI Chart vẽ đè lên nhau
     return {
         "labels": [d["label"] for d in hien_tai_full],
         "data_hien_tai": [d["value"] for d in hien_tai_full],

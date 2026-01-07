@@ -11,8 +11,6 @@ import { ShoppingCart, AccountCircle, Favorite, Search, LocationOn, Inventory2, 
 import api from "../../../api";
 
 function Header() {
-  // State
-  const [gioHangMo, setGioHangMo] = useState(false);
   const [timKiemMo, setTimKiemMo] = useState(false);
   const [dangNhapMo, setDangNhapMo] = useState(false);
   const [sanPhamGioHang, setSanPhamGioHang] = useState([]);
@@ -28,7 +26,6 @@ function Header() {
 
   const dieuHuong = useNavigate();
 
-  // Hàm mở menu
   const moMenuNguoiDung = (event) => {
     if(token){
       setMenuAnchor(event.currentTarget);
@@ -37,12 +34,10 @@ function Header() {
     }
   };
 
-  // Hàm đóng menu
   const dongMenuNguoiDung = () => {
     setMenuAnchor(null);
   };
 
-  // Đăng xuất
   const xoaDangNhap = () => {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
       logout();
@@ -52,7 +47,6 @@ function Header() {
    }
   };
 
-  // Lấy số sản phẩm trong giỏ hàng
   useEffect(() => {
     if (token) {
       laySoSanPhamGioHang();
@@ -115,14 +109,8 @@ function Header() {
 
           {/* Support + Cart */}
           <div className="col-sm-8 col-lg-4 mt-4 mt-sm-0">
-
-            {/* ===== DESKTOP ===== */}
             <div className="d-none d-lg-flex justify-content-end align-items-start gap-3">
-
-              {/* CỘT ĐỊA CHỈ + TÀI KHOẢN */}
               <div className="d-flex flex-column align-items-end gap-2">
-
-                {/* ĐỊA CHỈ */}
                 <div
                   className="d-flex align-items-center px-3 py-1"
                   style={{

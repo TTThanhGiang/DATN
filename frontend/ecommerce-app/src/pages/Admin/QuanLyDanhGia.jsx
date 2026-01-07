@@ -196,7 +196,9 @@ export default function QuanLyDanhGia() {
                 ))}
               </TableBody>
             </Table>
-            <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
+            
+          </TableContainer>
+          <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
               <Pagination
                 count={Math.ceil(tong / limit)}
                 page={page}
@@ -204,8 +206,7 @@ export default function QuanLyDanhGia() {
                 color="primary"
                 shape="rounded"
               />
-              </Stack>
-          </TableContainer>
+          </Stack>
         </>
       )}
 
@@ -263,7 +264,7 @@ export default function QuanLyDanhGia() {
 
               {/* Nút thao tác */}
               <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
-                {danhGiaDangChon.trang_thai === "CHO_DUYET" ? (
+                {danhGiaDangChon.trang_thai === "CHO_XU_LY" ? (
                   <>
                     <Button 
                       variant="contained" 

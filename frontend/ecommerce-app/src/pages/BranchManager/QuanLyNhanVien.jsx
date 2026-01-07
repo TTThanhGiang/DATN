@@ -160,8 +160,11 @@ export default function QuanLyNhanVien() {
         alert(res.data.message || "Có lỗi xảy ra!");
       }
     } catch (loi) {
-      console.error(loi);
-      alert(loi.response?.data?.message || "Lỗi khi tạo người dùng mới!");
+      const message = loi.response?.data?.detail || 
+                      loi.response?.data?.message || 
+                      "Đã có lỗi xảy ra, vui lòng thử lại";
+      
+      alert(message);
 
     }
   };

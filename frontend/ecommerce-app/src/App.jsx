@@ -23,6 +23,7 @@ import GioHang from "./pages/User/Checkout/GioHang";
 import DanhSachSanPham from "./pages/User/Products/DanhSachSanPham";
 import LichSuDonHang  from "./pages/User/Account/LichSuDonHang";
 import ChiTietKhuyenMai from "./pages/User/Products/SanPhamKhuyenMai";
+import KetQuaThanhToan from "./pages/User/Checkout/KetQuaThanhToan";
 
 // Admin pages
 import QuanLyNhanVien from "./pages/BranchManager/QuanLyNhanVien";
@@ -59,6 +60,8 @@ function App() {
                 <Route path="/danh-muc/:id" element={<DanhSachSanPham />} />
                 <Route path="/danh-muc/:id/:subId?" element={<DanhSachSanPham />} />
                 <Route path="/khuyen-mai/:id" element={<ChiTietKhuyenMai />} />
+                <Route path="/thanh-toan-thanh-cong" element={<KetQuaThanhToan />} />
+                <Route path="/thanh-toan-that-bai" element={<KetQuaThanhToan />} />
                 {/* ===========================
                 KHU VỰC QUẢN LÝ TÀI KHOẢN
               ============================ */}
@@ -80,7 +83,7 @@ function App() {
             <ProtectedRoute role="admin">
               <AdminLayout>
                 <Routes>
-                  <Route path="dashboard" element={<TongQuan />} />
+                  <Route path="tong-quan" element={<TongQuan />} />
                   <Route path="tai-khoans" element={<QuanLyTaiKhoan />} />
                   <Route path="chi-nhanhs" element={<QuanLyChiNhanh />} />
                   <Route path="danh-mucs" element={<QuanLyDanhMuc />} />
@@ -98,12 +101,12 @@ function App() {
 
         {/* BRANCH MANAGER */}
         <Route
-          path="/manager/*"
+          path="/quan-ly/*"
           element={
             <ProtectedRoute role="manager">
               <AdminLayout>
                 <Routes>
-                  <Route path="dashboard" element={<TongQuanQuanLy />} />
+                  <Route path="tong-quan" element={<TongQuanQuanLy />} />
                   <Route path="nhan-viens" element={<QuanLyNhanVien />} />
                   <Route path="ton-khos" element={<QuanLyTonKho />} />
                   <Route path="khuyen-mais" element={<QuanLyKhuyenMai />} />
@@ -117,14 +120,14 @@ function App() {
 
         {/* STAFF */}
         <Route
-          path="/staff/*"
+          path="/nhan-vien/*"
           element={
             <ProtectedRoute role="staff">
               <AdminLayout>
                 <Routes>
-                  <Route path="dashboard" element={<TongQuanStaff />} />
-                  <Route path="orders" element={<QuanLyDonHangStaff />} />
-                  <Route path="profile" element={<ThongTinCaNhanStaff />} />
+                  <Route path="tong-quan" element={<TongQuanStaff />} />
+                  <Route path="don-hangs" element={<QuanLyDonHangStaff />} />
+                  <Route path="tai-khoans" element={<ThongTinCaNhanStaff />} />
                 </Routes>
               </AdminLayout>
             </ProtectedRoute>

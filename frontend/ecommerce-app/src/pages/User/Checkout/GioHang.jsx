@@ -41,6 +41,15 @@ export default function Cart() {
     layDanhSachKhuyenMai();
   }, [token]);
 
+  useEffect(() => {
+    if (voucherHienTai && voucherHienTai.chi_nhanh_ap_dung) {
+      if (!chiNhanhDaChon || chiNhanhDaChon.ma_chi_nhanh !== voucherHienTai.chi_nhanh_ap_dung) {
+        huyMaGiamGia();
+        alert("Mã giảm giá đã bị hủy do không áp dụng cho chi nhánh này.");
+      }
+    }
+  }, [chiNhanhDaChon]);
+
   const layGioHang = async () => {
     try {
       const res = await api.get("/users/gio-hang", { headers: { Authorization: `Bearer ${token}` } });
@@ -79,7 +88,6 @@ export default function Cart() {
 
       if (voucherHienTai) {
         const listApDung = voucherHienTai.san_pham_ap_dung || [];
-        // Nếu list rỗng = áp dụng tất cả, nếu có list thì check ma_san_pham
         const duocGiam = listApDung.length === 0 || listApDung.includes(item.ma_san_pham);
         if (duocGiam) {
           tienGiam += rowPrice * (voucherHienTai.giam_gia / 100);
@@ -109,8 +117,19 @@ export default function Cart() {
         alert("Mã không tồn tại");
         return;
       }
+      if (km.chi_nhanh_ap_dung){
+        if (!chiNhanhDaChon) {
+          alert("Voucher này chỉ áp dụng cho một chi nhánh cụ thể. Vui lòng chọn chi nhánh trước.");
+          setMoDialogVoucher(false);
+          setMoDialogChiNhanh(true);
+          return;
+        }
+        if (km.chi_nhanh_ap_dung !== chiNhanhDaChon.ma_chi_nhanh) {
+          alert(`Mã này chỉ áp dụng tại chi nhánh: ${km.chi_nhanh_ap_dung}`);
+          return;
+        }
+      }
 
-      // Kiểm tra xem giỏ hàng có sản phẩm nào thuộc diện được giảm không
       const listSP = km.san_pham_ap_dung || [];
       if (listSP.length > 0) {
         const coSPHopLe = danhSachSanPham.some(sp => listSP.includes(sp.ma_san_pham));
@@ -120,7 +139,6 @@ export default function Cart() {
         }
       }
 
-      // Cập nhật voucher đang sử dụng
       setVoucherHienTai(km);
       setMaGiamGiaInput(km.ma_code);
       setMoDialogVoucher(false);
@@ -227,7 +245,18 @@ export default function Cart() {
                     <Grid size={{ xs: 12, md: 6}}><TextField label="SĐT" fullWidth value={soDienThoai} onChange={(e) => setSoDienThoai(e.target.value)}  /></Grid>
                     <Grid size={{ xs: 12, md: 6}}><TextField label="Địa chỉ" fullWidth value={diaChi} onChange={(e) => setDiaChi(e.target.value)}  /></Grid>
                     <Grid size={{ xs: 12, md: 6}}>
-                      <Button fullWidth variant="outlined" sx={{ justifyContent: 'space-between' }} onClick={() => setMoDialogChiNhanh(true)}>
+                      <Button fullWidth variant="outlined" 
+                        sx={{
+                          height: '56px',
+                          justifyContent: 'space-between',
+                          px: 2,
+                          borderColor: 'rgba(0, 0, 0, 0.23)',
+                          '&:hover': {
+                            borderColor: 'text.primary',
+                            bgcolor: 'rgba(133, 158, 225, 0.04)'
+                          }
+                        }} 
+                        onClick={() => setMoDialogChiNhanh(true)}>
                         {chiNhanhDaChon ? chiNhanhDaChon.ten_chi_nhanh : "Chọn chi nhánh nhận hàng"}
                         <ArrowDropDownIcon />
                       </Button>
@@ -319,14 +348,44 @@ export default function Cart() {
       <Dialog open={moDialogVoucher} onClose={() => setMoDialogVoucher(false)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 'bold' }}>Chọn khuyến mãi</DialogTitle>
         <DialogContent dividers sx={{ bgcolor: "#f8f9fa" }}>
-          <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              gap: 1.5, 
+              mb: 3, 
+              p: 1, 
+              bgcolor: '#f8f9fa', 
+              borderRadius: 2,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)' 
+            }}
+          >
             <TextField 
-              fullWidth size="small" placeholder="Nhập mã..." 
+              fullWidth 
+              size="small" 
+              placeholder="Nhập mã giảm giá..." 
               value={maGiamGiaInput} 
               onChange={(e) => setMaGiamGiaInput(e.target.value)} 
-              sx={{ bgcolor: "white" }}
+              sx={{ 
+                bgcolor: "white",
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '8px',
+                }
+              }}
             />
-            <Button variant="contained" onClick={() => apDungMaGiamGia()}>Áp dụng</Button>
+            <Button 
+              variant="contained" 
+              disableElevation
+              onClick={() => apDungMaGiamGia()}
+              sx={{ 
+                px: 3, 
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Áp dụng
+            </Button>
           </Box>
           <Stack spacing={2}>
             {tatCaKhuyenMai.map((km) => (
@@ -339,12 +398,13 @@ export default function Cart() {
                   '&:hover': { boxShadow: 2 }
                 }}
               >
-                <Box sx={{ bgcolor: 'error.main', color: 'white', p: 1, borderRadius: 1, minWidth: 50, textAlign: 'center', mr: 2 }}>
-                  <Typography variant="body2" fontWeight="bold">{km.giam_gia}%</Typography>
+                <Box sx={{ bgcolor: 'error.main', color: 'white', p: 1, borderRadius: 1, minWidth: 50, textAlign: 'center', mr: 2, alignContent: 'center' }}>
+                  <Typography variant="body2" fontWeight="bold">{km.phan_tram_giam}%</Typography>
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" fontWeight="bold">{km.ma_code}</Typography>
                   <Typography variant="caption" color="text.secondary">{km.mo_ta}</Typography>
+                  <Typography variant="body2" color="text.secondary">HSD: {km.ngay_ket_thuc}</Typography>
                 </Box>
               </Paper>
             ))}

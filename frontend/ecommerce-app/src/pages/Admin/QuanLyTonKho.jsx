@@ -376,8 +376,8 @@ export default function QuanLyTonKho() {
                 ))}
               </TableBody>
             </Table>
-
-            <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
+          </TableContainer>
+          <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
               <Pagination
                 count={Math.ceil(tongSo / gioiHan)}
                 page={trang}
@@ -386,7 +386,6 @@ export default function QuanLyTonKho() {
                 shape="rounded"
               />
             </Stack>
-          </TableContainer>
         </Box>
       )}
 
@@ -394,7 +393,6 @@ export default function QuanLyTonKho() {
       {tabDangChon === 1 && (
         <Stack spacing={3}>
           
-          {/* SELECT PRODUCTS */}
           <OutlinedInput
             placeholder="Chọn sản phẩm..."
             value={
@@ -413,7 +411,6 @@ export default function QuanLyTonKho() {
             sx={{ cursor: "pointer" }}
           />
 
-          {/* SHOW SELECTED PRODUCTS */}
           {sanPhamDaChon.length > 0 && (
             <Stack spacing={1} sx={{ mt: 1 }}>
               {sanPhamDaChon.map((p) => (
@@ -595,7 +592,6 @@ export default function QuanLyTonKho() {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG CHỌN SẢN PHẨM — MULTI SELECT */}
       <Dialog open={moDialogSanPham} onClose={() => setMoDialogSanPham(false)} fullWidth maxWidth="sm">
         <DialogTitle>Chọn sản phẩm</DialogTitle>
         <DialogContent>

@@ -26,13 +26,9 @@ export default function DanhSachSanPhamXuHuong() {
       try {
         const phanHoi = await api.get("/goi-y/trending/danh-muc");
         const duLieu = phanHoi.data;
-
         setDanhMuc(duLieu);
-
-        // Hợp nhất tất cả sản phẩm từ các danh mục vào một mảng duy nhất
         const mangHopNhat = Object.values(duLieu).flatMap((dm) => dm.san_phams);
         setTatCaSanPham(mangHopNhat);
-        console.log(duLieu)
       } catch (err) {
         console.error("Lỗi khi tải sản phẩm xu hướng:", err);
       } finally {
@@ -43,13 +39,12 @@ export default function DanhSachSanPhamXuHuong() {
     taiSanPhamXuHuong();
   }, []);
 
-  // Xử lý khi chuyển Tab
+
   const thayDoiTab = (event, giaTriMoi) => {
     setTabHienTai(giaTriMoi);
     setSoLuongHienThi(GIOI_HAN_MAC_DINH);
   };
 
-  // Lọc danh sách sản phẩm dựa trên Tab
   const danhSachLoc =
     tabHienTai === "tat_ca"
       ? tatCaSanPham
@@ -68,7 +63,6 @@ export default function DanhSachSanPhamXuHuong() {
 
   return (
     <Box component="section" sx={{ py: 4 }}>
-      {/* Tiêu đề và Tabs điều hướng */}
       <Box 
         sx={{ 
           display: "flex", 
@@ -105,16 +99,15 @@ export default function DanhSachSanPhamXuHuong() {
         </Tabs>
       </Box>
 
-      {/* Lưới sản phẩm (Grid) */}
       <Box
         sx={{
           display: "grid",
           gap: 3,
           gridTemplateColumns: {
-            xs: "repeat(2, 1fr)",      // 2 cột trên điện thoại
-            sm: "repeat(3, 1fr)",      // 3 cột trên tablet
-            md: "repeat(4, 1fr)",      // 4 cột trên laptop
-            lg: "repeat(5, 1fr)",      // 5 cột trên màn hình lớn
+            xs: "repeat(2, 1fr)",      
+            sm: "repeat(3, 1fr)",      
+            md: "repeat(4, 1fr)",     
+            lg: "repeat(5, 1fr)",      
           },
         }}
       >
@@ -127,7 +120,6 @@ export default function DanhSachSanPhamXuHuong() {
         ))}
       </Box>
 
-      {/* Khu vực nút hành động */}
       <Stack direction="row" justifyContent="center" mt={5} spacing={2}>
         {coTheXemThem ? (
           <Button 

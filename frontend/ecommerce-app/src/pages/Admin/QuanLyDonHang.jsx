@@ -145,12 +145,11 @@ export default function QuanLyDonHang() {
       "CHO_XU_LY": "pending",
       "DA_XU_LY": "approved",
       "DA_HUY": "rejected",
-      "HOAN_THANH": "completed", // thêm trạng thái hoàn thành
+      "HOAN_THANH": "completed", 
     };
 
-    const trangThaiGiaoDien = mapBackendToFrontend[trangThai] || "pending"; // default fallback
+    const trangThaiGiaoDien = mapBackendToFrontend[trangThai] || "pending";
 
-    // Map frontend key sang label & color
     const danhSachTrangThai = {
       pending: { label: "Chờ xử lý", color: "warning" },
       approved: { label: "Đã duyệt", color: "success" },

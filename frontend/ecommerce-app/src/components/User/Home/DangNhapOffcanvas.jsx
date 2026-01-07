@@ -58,13 +58,13 @@ function DangNhapOffcanvas({ mo, dong }) {
       // Điều hướng theo vai trò
       switch (vai_tro) {
         case "QUAN_TRI_VIEN":
-          dieuHuong("/admin/dashboard");
+          dieuHuong("/admin/tong-quan");
           break;
         case "QUAN_LY":
-          dieuHuong("/manager/dashboard");
+          dieuHuong("/quan-ly/tong-quan");
           break;
         case "NHAN_VIEN":
-          dieuHuong("/staff/dashboard");
+          dieuHuong("/nhan-vien/tong-quan");
           break;
         default:
           dieuHuong("/");

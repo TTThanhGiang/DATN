@@ -25,7 +25,7 @@ def cosine(v1, v2):
     mau = math.sqrt(sum(a*a for a in v1)) * math.sqrt(sum(b*b for b in v2))
     return tu / mau if mau else 0
 
-# ================== CONTENT ==================
+# ================== Nội dung ==================
 
 def goi_y_theo_noi_dung(ma_nguoi_dung, du_lieu):
     ma_nguoi_dung = str(ma_nguoi_dung)
@@ -57,7 +57,7 @@ def goi_y_theo_noi_dung(ma_nguoi_dung, du_lieu):
 
     return sorted(ket_qua, key=lambda x: x["diem"], reverse=True)[:5]
 
-# ================== USER ==================
+# ================== Người dùng ==================
 
 def goi_y_theo_nguoi_dung(ma_nguoi_dung, du_lieu):
     ma_nguoi_dung = str(ma_nguoi_dung)
@@ -95,7 +95,7 @@ def goi_y_theo_nguoi_dung(ma_nguoi_dung, du_lieu):
 
     return sorted(ket_qua, key=lambda x: x["diem"], reverse=True)
 
-# ================== POPULAR ==================
+# ================== Phổ biến ==================
 
 def goi_y_pho_bien(du_lieu, so_ngay=30):
     moc = datetime.now() - timedelta(days=so_ngay)
@@ -307,3 +307,4 @@ def goi_y_thinh_hanh_theo_danh_muc(du_lieu, so_ngay=30, top_danh_muc=3, top_san_
         )[:top_san_pham]
 
     return ket_qua
+

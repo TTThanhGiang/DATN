@@ -42,7 +42,6 @@ return (
       }}
     >
       <Container maxWidth="lg">
-        {/* Header Section */}
         <Stack
           direction="row"
           justifyContent="space-between"
@@ -69,25 +68,8 @@ return (
               Số lượng có hạn, nhanh tay lấy mã ngay!
             </Typography>
           </Box>
-
-          {/* <Button
-            variant="contained"
-            disableElevation
-            sx={{
-              textTransform: "none",
-              fontWeight: "bold",
-              borderRadius: "10px",
-              backgroundColor: "#2E7D32",
-              px: 3,
-              "&:hover": { backgroundColor: "#1B5E20" },
-              display: { xs: "none", sm: "block" } // Ẩn trên mobile để header gọn hơn
-            }}
-          >
-            Xem tất cả
-          </Button> */}
         </Stack>
 
-        {/* Slider Area */}
         <Box sx={{
           ".swiper": { pb: 5, px: 0.5 },
           ".swiper-pagination-bullet": { width: 8, height: 8, backgroundColor: "#ccc", opacity: 1 },
@@ -96,7 +78,7 @@ return (
           <Swiper
             modules={[Navigation, Pagination]}
             pagination={{ clickable: true }}
-            slidesPerView={1.2} // Hiển thị một phần của slide tiếp theo để người dùng biết là trượt được
+            slidesPerView={1.2}
             spaceBetween={16}
             breakpoints={{
               640: { slidesPerView: 2, spaceBetween: 20 },
@@ -111,7 +93,6 @@ return (
                 </SwiperSlide>
               ))
             ) : (
-              // Skeleton giả lập
               [1, 2, 3, 4].map(i => (
                 <SwiperSlide key={i}>
                   <Box sx={{ width: '100%', height: 110, bgcolor: '#eee', borderRadius: 3, animation: 'pulse 1.5s infinite' }} />

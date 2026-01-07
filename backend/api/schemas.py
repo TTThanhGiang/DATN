@@ -1,5 +1,4 @@
 from datetime import datetime
-from turtle import st
 from click import DateTime
 from pydantic import BaseModel, EmailStr, Field, validator
 from decimal import Decimal
@@ -63,13 +62,13 @@ class DanhMucCreate(BaseModel):
     hinh_anhs: List[HinhAnhSchema] = []
 
 class SanPhamSchema(BaseModel):
-    ma_san_pham: int
+    ma_san_pham: int | None = None
     ten_san_pham: str
     mo_ta: Optional[str] = None
     don_gia: int
     giam_gia: Decimal = Field(default=0, ge=0, le=100)
     ma_danh_muc: int
-    ten_danh_muc: str
+    ten_danh_muc: str | None = None
     don_vi: Optional[str] = None
     hinh_anhs: List[HinhAnhSchema] = []
 

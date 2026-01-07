@@ -238,7 +238,6 @@ export default function QuanLyKhuyenMai() {
 
       let phanHoi;
       if (khuyenMaiDangSua) {
-        // CẬP NHẬT
         phanHoi = await api.put(`/manager/cap-nhat-khuyen-mai/${khuyenMaiDangSua.ma_khuyen_mai}`, duLieuGui, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -247,7 +246,6 @@ export default function QuanLyKhuyenMai() {
         });
         alert("Cập nhật khuyến mãi thành công!");
       } else {
-        // TẠO MỚI
         phanHoi = await api.post("/manager/tao-khuyen-mai", duLieuGui, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -257,9 +255,8 @@ export default function QuanLyKhuyenMai() {
         alert("Thêm khuyến mãi thành công!");
       }
 
-      taiDanhSachKhuyenMai(); // load lại danh sách
+      taiDanhSachKhuyenMai();
 
-      // Reset form
       setDuLieuForm({
         ten_khuyen_mai: "",
         ma_khuyen_mai: "",
@@ -452,7 +449,7 @@ export default function QuanLyKhuyenMai() {
                         size="small"
                         color="error"
                         onClick={() =>
-                          xuLyChonSanPham(p) // bỏ chọn
+                          xuLyChonSanPham(p)
                         }
                       >
                         Xoá

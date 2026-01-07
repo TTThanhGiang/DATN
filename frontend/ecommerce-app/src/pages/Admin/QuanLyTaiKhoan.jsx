@@ -174,16 +174,23 @@ export default function QuanLyTaiKhoan() {
           ? duLieuForm.ma_chi_nhanh
           : null,
     };
-
-    const res = await api.post("/admins/them-nguoi-dung", payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (res.data.success) {
-      alert("Tạo tài khoản thành công");
-      setTabDangChon(0);
-      layDanhSachNguoiDung();
+    try{
+      const res = await api.post("/admins/them-nguoi-dung", payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data.success) {
+        alert("Tạo tài khoản thành công");
+        setTabDangChon(0);
+        layDanhSachNguoiDung();
+        setChiNhanhDangChon(null);
+      }
+    }catch(loi){
+      const message = loi.response?.data?.detail || 
+                      loi.response?.data?.message || 
+                      "Đã có lỗi xảy ra, vui lòng thử lại";
+      alert(message);
     }
+    
   };
 
   const chiNhanhLoc = danhSachChiNhanh.filter(
@@ -286,8 +293,8 @@ export default function QuanLyTaiKhoan() {
                 ))}
               </TableBody>
             </Table>
-
-            <Stack alignItems="center" sx={{ my: 2 }}>
+          </TableContainer>
+          <Stack alignItems="center" sx={{ my: 2 }}>
               <Pagination
                 page={trang}
                 count={Math.ceil(tongSo / limit)}
@@ -296,7 +303,6 @@ export default function QuanLyTaiKhoan() {
                 shape="rounded"
               />
             </Stack>
-          </TableContainer>
         </>
       )}
 

@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from api.utils.email import gui_email_xac_thuc
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -109,36 +110,34 @@ def phan_quyen(*allowed_roles):
         return current_user
     return checker
 
-async def gui_email_xac_thuc(email: schemas.EmailSchema, ho_ten: str, db: Session):
-    raw_token = serializer.dumps(email, salt="email-confirm")
+# async def gui_email_xac_thuc(email: schemas.EmailSchema, ho_ten: str, db: Session):
+#     raw_token = serializer.dumps(email, salt="email-confirm")
 
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+#     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-    user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
-    if not user:
-        return
+#     user = db.query(NguoiDung).filter(NguoiDung.email == email).first()
+#     if not user:
+#         return
 
-    user.email_token = token_hash
-    db.commit()
+#     user.email_token = token_hash
+#     db.commit()
 
-    # 4. Link chỉ chứa hash
-    link = f"{HOST_BACKEND}/auth/xac-thuc-email/{token_hash}"
+#     link = f"{HOST_BACKEND}/auth/xac-thuc-email/{token_hash}"
 
-    message = MessageSchema(
-        subject="Xác thực email",
-        recipients=[email],
-        body=f"""
-        <p>Chào {ho_ten},</p>
-        <p>Nhấn vào link để xác thực email:</p>
-        <a href="{link}">Xác thực email</a>
-        <p>Link có hiệu lực trong 1 giờ.</p>
-        """,
-        subtype="html"
-    )
+#     message = MessageSchema(
+#         subject="Xác thực email",
+#         recipients=[email],
+#         body=f"""
+#         <p>Chào {ho_ten},</p>
+#         <p>Nhấn vào link để xác thực email:</p>
+#         <a href="{link}">Xác thực email</a>
+#         <p>Link có hiệu lực trong 1 giờ.</p>
+#         """,
+#         subtype="html"
+#     )
 
-    await fm.send_message(message)
+#     await fm.send_message(message)
 
-#---API Endpoints---#
 
 @router.post("/dang-nhap", response_model=schemas.Token)
 def dang_nhap(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):

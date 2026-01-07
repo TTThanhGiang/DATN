@@ -15,9 +15,9 @@ export default function ThanhDieuHuong({ vaiTro }) {
       case "QUAN_TRI_VIEN":
         return "/admin";
       case "QUAN_LY":
-        return "/manager";
+        return "/quan-ly";
       case "NHAN_VIEN":
-        return "/staff";
+        return "/nhan-vien";
       default:
         return "";
     }
@@ -25,7 +25,7 @@ export default function ThanhDieuHuong({ vaiTro }) {
 
   const cauHinhMenu = useMemo(() => {
     const menuChung = [
-      { tieuDe: "Tổng quan", icon: "bi-house-door", link: `${tienTo}/dashboard` },
+      { tieuDe: "Tổng quan", icon: "bi-house-door", link: `${tienTo}/tong-quan` },
     ];
 
     const menuAdmin = [
@@ -49,8 +49,8 @@ export default function ThanhDieuHuong({ vaiTro }) {
     ];
 
     const menuNhanVien = [
-      { tieuDe: "Quản lý đơn hàng", icon: "bi-cart-check", link: `${tienTo}/orders` },
-      { tieuDe: "Thông tin cá nhân", icon: "bi-person", link: `${tienTo}/profile` },
+      { tieuDe: "Quản lý đơn hàng", icon: "bi-cart-check", link: `${tienTo}/don-hangs` },
+      { tieuDe: "Thông tin cá nhân", icon: "bi-person", link: `${tienTo}/tai-khoans` },
     ];
 
     switch (vaiTro) {
@@ -116,56 +116,7 @@ export default function ThanhDieuHuong({ vaiTro }) {
                       3
                     </span>
                   </a>
-                  {/* Nội dung dropdown */}
-                  <div className="dropdown-menu dropdown-menu-end p-0">
-                    <div className="dropdown-menu-header p-3 border-bottom">
-                      <h5 className="mb-0">Thông báo</h5>
-                    </div>
-                    <div className="dropdown-menu-content">
-                      <div className="item p-3 border-bottom">
-                        <div className="d-flex align-items-center">
-                          <img
-                            className="profile-image me-2"
-                            src="/assets/images/profiles/profile-1.png"
-                            alt="User"
-                            width={32}
-                            height={32}
-                          />
-                          <div>
-                            <div className="desc">Amy đã chia sẻ file với bạn.</div>
-                            <div className="meta small text-muted">2 giờ trước</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="item p-3 border-bottom">
-                        <div className="d-flex align-items-center">
-                          <i className="bi bi-receipt text-primary fs-4 me-2"></i>
-                          <div>
-                            <div className="desc">Bạn có hóa đơn mới.</div>
-                            <div className="meta small text-muted">1 ngày trước</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="item p-3">
-                        <div className="d-flex align-items-center">
-                          <img
-                            className="profile-image me-2"
-                            src="/assets/images/profiles/profile-2.png"
-                            alt="User"
-                            width={32}
-                            height={32}
-                          />
-                          <div>
-                            <div className="desc">James gửi bạn tin nhắn mới.</div>
-                            <div className="meta small text-muted">7 ngày trước</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="dropdown-menu-footer p-2 text-center border-top">
-                      <a href="#">Xem tất cả</a>
-                    </div>
-                  </div>
+                  
                 </div>
 
                 {/* Settings */}
@@ -185,7 +136,7 @@ export default function ThanhDieuHuong({ vaiTro }) {
                     aria-expanded="false"
                   >
                     <img
-                      src="/assets/images/user.png"
+                      src="https://i.pravatar.cc/150"
                       alt="user profile"
                       className="rounded-circle"
                       width={36}

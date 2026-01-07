@@ -121,7 +121,7 @@ export default function QuanLyDanhMuc() {
 
       {/* --- TAB 1: DANH SÁCH --- */}
       {tabDangChon === 0 && (
-        <Box>
+        <>
           <Paper elevation={0} sx={{  mb: 1, borderRadius: 3,}}>
             <Grid container spacing={2} >
               <Grid size={{ xs: 12, md: 8 }}>
@@ -204,7 +204,8 @@ export default function QuanLyDanhMuc() {
                 ))}
               </TableBody>
             </Table>
-            <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
+          </TableContainer>
+          <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
               <Pagination
                 count={Math.ceil(tongSoLuong / gioiHan)}
                 page={trangHienTai}
@@ -213,8 +214,7 @@ export default function QuanLyDanhMuc() {
                 shape="rounded"
               />
             </Stack>
-          </TableContainer>
-        </Box>
+        </>
       )}
 
       {/* Tab Thêm / Sửa */}

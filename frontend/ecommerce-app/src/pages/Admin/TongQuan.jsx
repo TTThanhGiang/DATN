@@ -6,8 +6,6 @@ import {
   InputAdornment
 } from '@mui/material';
 
-// Import các bảng đã chuyển sang MUI ở bước trước
-// import ThongKeChiTiet from './ThongKeChiTiet'; 
 import KhungThongKe from "../../components/KhungThongKe";
 import api from '../../api';
 import BieuDoDoanhThu from '../../components/BieuDoDoanhThu';
@@ -33,7 +31,6 @@ export default function TongQuan() {
   const bayNgayTruoc = new Date();
   bayNgayTruoc.setDate(homNay.getDate() - 7);
 
-  // Set mặc định 7 ngày gần nhất
   const [ngayBatDau, setNgayBatDau] = useState(formatDate(bayNgayTruoc));
   const [ngayKetThuc, setNgayKetThuc] = useState(formatDate(homNay));
 
@@ -79,7 +76,7 @@ export default function TongQuan() {
 
     const timer = setTimeout(() => {
       fetchExtraData();
-      layDuLieuDashboard(); // Hàm cũ của bạn
+      layDuLieuDashboard();
     }, 500);
 
     return () => clearTimeout(timer);
@@ -156,12 +153,9 @@ export default function TongQuan() {
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
         Tổng quan {dangTai && <Typography variant="caption">(Đang cập nhật...)</Typography>}
       </Typography>
-
-      {/* --- Thanh Bộ Lọc --- */}
       <Paper elevation={0} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: '1px solid #e0e0e0', bgcolor: '#fafafa' }}>
         <Grid container spacing={2} alignItems="center">
           
-          {/* Nhóm 1: Thời gian & So sánh */}
           <Grid size={{ xs: 12, md: 2.5 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Mốc so sánh</InputLabel>
@@ -206,7 +200,6 @@ export default function TongQuan() {
             />
           </Grid>
 
-          {/* Nhóm 2: Chi nhánh */}
           <Grid size={{ xs: 12, md: 2.5 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Chi nhánh</InputLabel>
@@ -227,7 +220,6 @@ export default function TongQuan() {
             </FormControl>
           </Grid>
 
-          {/* Nhóm 3: Tìm kiếm sản phẩm */}
           <Grid size={{ xs: 12, md: 3 }}>
             <TextField 
               fullWidth size="small" 

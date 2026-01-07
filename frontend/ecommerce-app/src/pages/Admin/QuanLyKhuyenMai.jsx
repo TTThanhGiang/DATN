@@ -127,6 +127,7 @@ export default function QuanLyKhuyenMai() {
   const thayDoiTab = (_, giaTriMoi) => {
     setTabHienTai(giaTriMoi);
     setKhuyenMaiDangSua(null);
+    setChiNhanhDaChon(null);
 
     if (giaTriMoi === 0) {
       setDuLieuForm({
@@ -217,9 +218,13 @@ export default function QuanLyKhuyenMai() {
       }
 
       layDanhSachKhuyenMai();
-      thayDoiTab(null, 0); // Reset về danh sách
+      thayDoiTab(null, 0);
     } catch (loi) {
-      alert(loi.phanHoi?.data?.message || loi.message || "Lưu khuyến mãi thất bại");
+      const thongBaoLoi = loi.response?.data?.detail || 
+                         loi.response?.data?.message || 
+                         "Không thể kết nối đến máy chủ";
+    
+      alert(thongBaoLoi);
     }
   };
 
@@ -385,7 +390,8 @@ export default function QuanLyKhuyenMai() {
                 ))}
               </TableBody>
             </Table>
-            <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
+          </TableContainer>
+          <Stack spacing={2} alignItems="center" sx={{ mt: 2, mb: 4 }}>
               <Pagination
                 count={Math.ceil(tongSoLuong / gioiHan)}
                 page={trangHienTai}
@@ -394,7 +400,6 @@ export default function QuanLyKhuyenMai() {
                 shape="rounded"
               />
             </Stack>
-          </TableContainer>
         </>
       )}
 
@@ -448,26 +453,64 @@ export default function QuanLyKhuyenMai() {
           <Divider />
           {khuyenMaiDangSua ? (
             <Stack direction="row" spacing={2} justifyContent="center">
-              <Button variant="contained" color="primary" onClick={xuLyDuyet}>Duyệt</Button>
-              <Button variant="outlined" color="error" onClick={() => setMoHuyKhuyenMai(true)}>Từ chối</Button>
+              <Button 
+                variant="contained" 
+                onClick={xuLyLuuKhuyenMai}
+                disabled={khuyenMaiDangSua.trang_thai !== "CHO_XU_LY"}
+              >
+                Cập nhật
+              </Button>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={xuLyDuyet}
+                disabled={khuyenMaiDangSua.trang_thai !== "CHO_XU_LY"}
+              >
+                Duyệt
+              </Button>
+              <Button 
+                variant="outlined" 
+                color="error" 
+                onClick={() => setMoHuyKhuyenMai(true)}
+                disabled={khuyenMaiDangSua.trang_thai !== "CHO_XU_LY"}
+              >
+                Từ chối
+              </Button>
             </Stack>
-          ) : (
-            <Button variant="contained" startIcon={<AddCircleOutline />} onClick={xuLyLuuKhuyenMai}>Lưu khuyến mãi</Button>
+            ) : (
+            <Button 
+              fullWidth 
+              variant="contained" 
+              startIcon={<AddCircleOutline />} 
+              onClick={xuLyLuuKhuyenMai}
+            >
+              Lưu khuyến mãi
+            </Button>
           )}
         </Stack>
       )}
-
-      {/* Dialogs Chọn sản phẩm, chi nhánh và Lý do hủy tương tự (đã Việt hóa biến) */}
       <Dialog open={moChonSanPham} onClose={() => setMoChonSanPham(false)} fullWidth>
         <DialogTitle>Chọn sản phẩm</DialogTitle>
         <DialogContent>
            <TextField fullWidth placeholder="Tìm sản phẩm..." value={timKiemSanPham} onChange={(e) => setTimKiemSanPham(e.target.value)} sx={{ mb: 2 }} />
            <List>
-             {sanPhamLoc.map(sp => (
-               <ListItemButton key={sp.ma_san_pham} onClick={() => xuLyChonSanPham(sp)}>
-                 <ListItemText primary={sp.ten_san_pham} />
-               </ListItemButton>
-             ))}
+             {sanPhamLoc.map(sp => {
+              console.log(sp);
+              const isSelected = sanPhamDaChon.some(
+                (p) => p.ma_san_pham === sp.ma_san_pham
+              );
+              return (
+                <React.Fragment key={sp.ma_san_pham}>
+                  <ListItemButton
+                    selected={isSelected}
+                    onClick={() => xuLyChonSanPham(sp)}
+                  >
+                    <ListItemText primary={sp.ten_san_pham} />
+                  </ListItemButton>
+                  <Divider />
+                </React.Fragment>
+              );
+            })}
            </List>
         </DialogContent>
       </Dialog>
