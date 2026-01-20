@@ -2,15 +2,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import math
 
-# ================== UTIL ==================
-
 def chuyen_sang_datetime(tg):
     if isinstance(tg, datetime):
         return tg
     if isinstance(tg, str):
         return datetime.fromisoformat(tg)
     return None
-
 
 def giam_trong_so_theo_thoi_gian(thoi_gian, he_so=0.1):
     tg = chuyen_sang_datetime(thoi_gian)
@@ -19,11 +16,27 @@ def giam_trong_so_theo_thoi_gian(thoi_gian, he_so=0.1):
     so_ngay = (datetime.now() - tg).days
     return math.exp(-he_so * so_ngay)
 
-
 def cosine(v1, v2):
     tu = sum(a * b for a, b in zip(v1, v2))
     mau = math.sqrt(sum(a*a for a in v1)) * math.sqrt(sum(b*b for b in v2))
     return tu / mau if mau else 0
+
+def chuan_hoa_ket_qua(danh_sach_kq):
+    if not danh_sach_kq:
+        return []
+    
+    tat_ca_diem = [r["diem"] for r in danh_sach_kq]
+    diem_nho_nhat = min(tat_ca_diem)
+    diem_lon_nhat = max(tat_ca_diem)
+    
+    if diem_lon_nhat == diem_nho_nhat:
+        for r in danh_sach_kq: 
+            r["diem_chuan_hoa"] = 1.0
+    else:
+        for r in danh_sach_kq:
+            r["diem_chuan_hoa"] = (r["diem"] - diem_nho_nhat) / (diem_lon_nhat - diem_nho_nhat)
+            
+    return danh_sach_kq
 
 # ================== Nội dung ==================
 
@@ -55,7 +68,7 @@ def goi_y_theo_noi_dung(ma_nguoi_dung, du_lieu):
                 "phuong_phap": "noi_dung"
             })
 
-    return sorted(ket_qua, key=lambda x: x["diem"], reverse=True)[:5]
+    return sorted(ket_qua, key=lambda x: x["diem"], reverse=True)
 
 # ================== Người dùng ==================
 
@@ -133,29 +146,43 @@ def goi_y_pho_bien(du_lieu, so_ngay=30):
 # ================== HYBRID ==================
 
 def goi_y_ket_hop(ma_nguoi_dung, du_lieu, top_n=10):
-    ds = (
-        goi_y_theo_noi_dung(ma_nguoi_dung, du_lieu) +
-        goi_y_theo_nguoi_dung(ma_nguoi_dung, du_lieu) +
-        goi_y_pho_bien(du_lieu)
-    )
+    ds_noi_dung = goi_y_theo_noi_dung(ma_nguoi_dung, du_lieu)
+    ds_nguoi_dung = goi_y_theo_nguoi_dung(ma_nguoi_dung, du_lieu)
+    ds_pho_bien = goi_y_pho_bien(du_lieu)
 
-    tong = defaultdict(float)
-    ten_sp = {}
+    ds_noi_dung = chuan_hoa_ket_qua(ds_noi_dung)
+    ds_nguoi_dung = chuan_hoa_ket_qua(ds_nguoi_dung)
+    ds_pho_bien = chuan_hoa_ket_qua(ds_pho_bien)
 
-    for i, r in enumerate(ds):
-        pid = r["ma_san_pham"]
-        he_so = max(1 - i * 0.02, 0.6)
-        tong[pid] += r["diem"] * he_so
-        ten_sp[pid] = r["ten"]
+    tong_diem_san_pham = defaultdict(float)
+    ten_san_pham = {}
 
-    return sorted(
-        [
-            {"ma_san_pham": pid, "ten": ten_sp[pid], "diem": round(diem, 2)}
-            for pid, diem in tong.items()
-        ],
-        key=lambda x: x["diem"],
-        reverse=True
-    )[:top_n]
+    cac_nguon_goi_y = [
+        (ds_noi_dung, 0.4),   
+        (ds_nguoi_dung, 0.4), 
+        (ds_pho_bien, 0.2)    
+    ]
+
+    for danh_sach, trong_so_nguon in cac_nguon_goi_y:
+        for hang, r in enumerate(danh_sach):
+            ma_sp = r["ma_san_pham"]
+            he_so_hang = max(1 - hang * 0.05, 0.5) 
+            diem_tong_hop = r["diem_chuan_hoa"] * trong_so_nguon * he_so_hang
+            tong_diem_san_pham[ma_sp] += diem_tong_hop
+            ten_san_pham[ma_sp] = r["ten"]
+
+    ket_qua_cuoi_cung = [
+        {
+            "ma_san_pham": ma_sp, 
+            "ten": ten_san_pham[ma_sp], 
+            "diem_cuoi": round(diem, 4)
+        }
+        for ma_sp, diem in tong_diem_san_pham.items()
+    ]
+    
+    ket_qua_cuoi_cung.sort(key=lambda x: x["diem_cuoi"], reverse=True)
+    
+    return ket_qua_cuoi_cung[:top_n]
 
 def goi_y_pho_bien_cho_guest(du_lieu, so_ngay=30, top_n=20):
     moc_thoi_gian = datetime.now() - timedelta(days=so_ngay)
@@ -237,7 +264,6 @@ def goi_y_thinh_hanh_theo_danh_muc(du_lieu, so_ngay=30, top_danh_muc=3, top_san_
 
     thong_ke_danh_muc = defaultdict(int)
 
-    # ===================== LƯỢT XEM =====================
     for danh_sach_xem in du_lieu["luot_xem"].values():
         for luot_xem in danh_sach_xem:
             thoi_gian = chuyen_sang_datetime(luot_xem.get("thoi_gian"))
@@ -252,7 +278,6 @@ def goi_y_thinh_hanh_theo_danh_muc(du_lieu, so_ngay=30, top_danh_muc=3, top_san_
             thong_ke_san_pham[ma_sp]["luot_xem"] += 1
             thong_ke_danh_muc[san_pham["ma_danh_muc"]] += 1
 
-    # ===================== LƯỢT MUA =====================
     for danh_sach_don in du_lieu["don_hang"].values():
         for don_hang in danh_sach_don:
             thoi_gian = chuyen_sang_datetime(don_hang.get("ngay_dat"))
@@ -268,14 +293,12 @@ def goi_y_thinh_hanh_theo_danh_muc(du_lieu, so_ngay=30, top_danh_muc=3, top_san_
                 thong_ke_san_pham[ma_sp]["luot_mua"] += 1
                 thong_ke_danh_muc[san_pham["ma_danh_muc"]] += 1
 
-    # ===================== TOP DANH MỤC =====================
     top_danh_muc_ids = sorted(
         thong_ke_danh_muc,
         key=lambda ma_dm: thong_ke_danh_muc[ma_dm],
         reverse=True
     )[:top_danh_muc]
 
-    # ===================== GROUP THEO DANH MỤC =====================
     ket_qua = defaultdict(list)
 
     for ma_sp, so_lieu in thong_ke_san_pham.items():
@@ -298,7 +321,6 @@ def goi_y_thinh_hanh_theo_danh_muc(du_lieu, so_ngay=30, top_danh_muc=3, top_san_
             "phuong_phap": "trending_category"
         })
 
-    # ===================== SORT & CẮT TOP =====================
     for ma_dm in ket_qua:
         ket_qua[ma_dm] = sorted(
             ket_qua[ma_dm],

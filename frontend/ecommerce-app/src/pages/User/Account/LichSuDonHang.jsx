@@ -14,6 +14,7 @@ export default function LichSuDonHang() {
   const [donHangs, setDonHangs] = useState([]);
   const [moDanhGia, setMoDanhGia] = useState(false);
   const [sanPhamDangDanhGia, setSanPhamDangDanhGia] = useState(null);
+  const [maDonHangDangDanhGia, setMaDonHangDangDanhGia] = useState(null);
 
   const token = getToken();
 
@@ -39,8 +40,9 @@ export default function LichSuDonHang() {
     }
   };
 
-  const suKienDanhGia = (sanPham) => {
+  const suKienDanhGia = (sanPham, maDonHang) => {
     setSanPhamDangDanhGia(sanPham);
+    setMaDonHangDangDanhGia(maDonHang);
     setMoDanhGia(true);
   };
 
@@ -83,6 +85,7 @@ export default function LichSuDonHang() {
       <FormDanhGia
         mo={moDanhGia}
         sanPham={sanPhamDangDanhGia}
+        maDonHang={maDonHangDangDanhGia}
         dong={() => setMoDanhGia(false)}
         fullScreen={isMobile}  
       />

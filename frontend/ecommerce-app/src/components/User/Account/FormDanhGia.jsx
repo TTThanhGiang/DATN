@@ -13,7 +13,7 @@ import { useState, useEffect } from "react";
 import api from "../../../api";
 import { getToken } from "../../../utils/auth";
 
-export default function FormDanhGia({ mo, dong, sanPham }) {
+export default function FormDanhGia({ mo, dong, sanPham, maDonHang }) {
   const [soSao, setSoSao] = useState(0);
   const [binhLuan, setBinhLuan] = useState("");
   const token = getToken();
@@ -35,7 +35,8 @@ export default function FormDanhGia({ mo, dong, sanPham }) {
     const duLieu = {
       ma_san_pham: sanPham?.ma_san_pham,
       so_sao: soSao,
-      binh_luan: binhLuan
+      binh_luan: binhLuan,
+      ma_don_hang: maDonHang,
     };
 
     try {

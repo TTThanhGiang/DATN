@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import {
-  Paper, Grid, Stack, InputLabel, OutlinedInput, IconButton, Dialog,
+  Paper, Grid, Stack, IconButton, Dialog,
   DialogTitle, DialogContent, TextField, List, ListItemButton, ListItemText,
-  Divider, Typography, Box, FormControl, RadioGroup, FormControlLabel,
+  Divider, Typography, Box, RadioGroup, FormControlLabel,
   Radio, Button,
 } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
@@ -124,7 +124,7 @@ export default function Cart() {
           setMoDialogChiNhanh(true);
           return;
         }
-        if (km.chi_nhanh_ap_dung !== chiNhanhDaChon.ma_chi_nhanh) {
+        if (km.chi_nhanh_ap_dung !== chiNhanhDaChon.ten_chi_nhanh) {
           alert(`Mã này chỉ áp dụng tại chi nhánh: ${km.chi_nhanh_ap_dung}`);
           return;
         }

@@ -304,7 +304,7 @@ export default function ChiTietSanPham() {
               </Typography>
             )}
 
-            {tabHienTai === 1 && (
+            {tabHienTai === 1 &&  (
               <Box
                 sx={{
                   display: "flex",

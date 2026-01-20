@@ -304,6 +304,7 @@ class FormDanhGia(BaseModel):
     ma_san_pham: int
     so_sao: int
     binh_luan: str
+    ma_don_hang: int
 
 class UserCreate(BaseModel):
     ho_ten: str

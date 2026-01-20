@@ -273,9 +273,12 @@ export default function QuanLyKhuyenMai() {
       setKhuyenMaiDangSua(null);
       setTabHienTai(0);
 
-    } catch (err) {
-      console.error(err);
-      alert(err.phanHoi?.data?.message || err.message || "Lưu khuyến mãi thất bại");
+    } catch (loi) {
+      const thongBaoLoi = loi.response?.data?.detail || 
+                         loi.response?.data?.message || 
+                         "Không thể kết nối đến máy chủ";
+    
+      alert(thongBaoLoi);
     }
   };
 

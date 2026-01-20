@@ -1,6 +1,6 @@
 import { Box, Typography, Card, CardMedia, Button } from "@mui/material";
 
-export default function SanPhamItem({ sanPham, suKienDanhGia }) {
+export default function SanPhamItem({ maDonHang, sanPham, suKienDanhGia }) {
   const giaHienTai = sanPham.gia_sau_giam || sanPham.gia_goc;
   const tongTienSanPham = giaHienTai * sanPham.so_luong;
 
@@ -61,7 +61,7 @@ export default function SanPhamItem({ sanPham, suKienDanhGia }) {
       <Button
         variant="contained"
         color="warning"
-        onClick={() => suKienDanhGia(sanPham)}
+        onClick={() => suKienDanhGia(sanPham, maDonHang)}
         sx={{
           px: { xs: 1.5, sm: 2.5 },   // padding ngang responsive
           minWidth: { xs: "auto", sm: 120 },

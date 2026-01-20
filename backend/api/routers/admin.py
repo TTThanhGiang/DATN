@@ -781,6 +781,15 @@ def duyet_don_hang(
 
     if don.trang_thai != "CHO_XU_LY":
         return error_response(message="Chỉ đơn hàng CHO_XU_LY mới được duyệt")
+    chi_tiet_don_hangs = db.query(ChiTietDonHang).filter(ChiTietDonHang.ma_don_hang == ma_don_hang).all()
+    for ct in chi_tiet_don_hangs:
+        ton_kho = db.query(TonKho).filter(
+            TonKho.ma_san_pham == ct.ma_san_pham,
+            TonKho.ma_chi_nhanh == don.ma_chi_nhanh
+        ).first()
+        if not ton_kho or ton_kho.so_luong_ton < ct.so_luong:
+            return error_response(message=f"Sản phẩm {ct.san_pham.ten_san_pham} không đủ tồn kho để duyệt đơn hàng")
+        ton_kho.so_luong_ton -= ct.so_luong
 
     don.trang_thai = "DA_XU_LY"
     db.commit()
@@ -1329,22 +1338,21 @@ def dashboard_tong_quan(
     ten_san_pham: Optional[str] = Query(None),
     kieu_so_sanh: str = "7_ngay"
 ):
-    # CHUẨN HÓA THỜI GIAN: Quan trọng nhất để lấy được ngày cuối cùng
+
     if den_ngay:
         den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
     
     tu_truoc, den_truoc, mo_ta_so_sanh = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
 
-    # 1. Lấy dữ liệu 2 kỳ
     hien_tai = query_tong_quan(db, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham)
     ky_truoc = query_tong_quan(db, ma_chi_nhanh, tu_truoc, den_truoc, ten_san_pham) if tu_truoc else None
 
-    # 2. Hàm tính % tăng trưởng
     def tinh_pct(val_ht, val_tr):
         ht = val_ht or 0
         tr = val_tr or 0
         if tr == 0: return 100 if ht > 0 else 0
         return round((ht - tr) / tr * 100, 2)
+    
 
     return {
         "bo_loc": {"mo_ta_so_sanh": mo_ta_so_sanh, "tu_ngay": tu_ngay, "den_ngay": den_ngay},
@@ -1360,20 +1368,7 @@ def dashboard_tong_quan(
         }
     }
 
-@router.get("/tong-quan/hieu-suat-chi-nhanh")
-def hieu_suat_chi_nhanh(
-    db: Session = Depends(get_db),
-    tu_ngay: Optional[datetime] = Query(None),
-    den_ngay: Optional[datetime] = Query(None),
-    ten_san_pham: Optional[str] = Query(None),
-    kieu_so_sanh: str = "7_ngay"
-):
-    if den_ngay:
-        den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
-    
-    tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
-
-    def get_data_by_period(start_date, end_date, product_name):
+def get_data_by_period(db: Session, start_date, end_date, product_name):
         query = db.query(
             ChiNhanh.ma_chi_nhanh.label("id"),
             ChiNhanh.ten_chi_nhanh.label("ten"),
@@ -1401,11 +1396,24 @@ def hieu_suat_chi_nhanh(
         
         return query.group_by(ChiNhanh.ma_chi_nhanh, ChiNhanh.ten_chi_nhanh).all()
 
-    hien_tai = get_data_by_period(tu_ngay, den_ngay, ten_san_pham)
+@router.get("/tong-quan/hieu-suat-chi-nhanh")
+def hieu_suat_chi_nhanh(
+    db: Session = Depends(get_db),
+    tu_ngay: Optional[datetime] = Query(None),
+    den_ngay: Optional[datetime] = Query(None),
+    ten_san_pham: Optional[str] = Query(None),
+    kieu_so_sanh: str = "7_ngay"
+):
+    if den_ngay:
+        den_ngay = den_ngay.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
+
+    hien_tai = get_data_by_period(db, tu_ngay, den_ngay, ten_san_pham)
 
     doanh_thu_truoc_map = {}
     if tu_truoc:
-        truoc = get_data_by_period(tu_truoc, den_truoc, ten_san_pham)
+        truoc = get_data_by_period(db, tu_truoc, den_truoc, ten_san_pham)
         doanh_thu_truoc_map = {item.id: item.doanh_thu for item in truoc}
 
     ket_qua = []
@@ -1439,7 +1447,7 @@ def get_top_san_pham_api(
     
     tu_truoc, den_truoc, _ = tinh_khoang_so_sanh(tu_ngay, den_ngay, kieu_so_sanh)
 
-    top_hien_tai = query_top_san_pham(db, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham, limit=10)
+    top_hien_tai = query_top_san_pham(db, ma_chi_nhanh, tu_ngay, den_ngay, ten_san_pham)
 
     doanh_thu_truoc_map = {}
     if tu_truoc and den_truoc:
@@ -1508,7 +1516,7 @@ def bieu_do_so_sanh(
             DonHang.trang_thai != "DA_HUY"
         )
         if ma_chi_nhanh:
-            results = results.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
+            query = query.filter(DonHang.ma_chi_nhanh == ma_chi_nhanh)
 
         results = query.group_by(cast(DonHang.ngay_dat, Date)).all()
         db_data = {r.ngay: float(r.total or 0) for r in results}

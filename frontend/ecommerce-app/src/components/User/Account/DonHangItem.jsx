@@ -53,6 +53,7 @@ export default function DonHangItem({ donHang, suKienDanhGia }) {
         <SanPhamItem
           key={index}
           sanPham={sp}
+          maDonHang={donHang.ma_don_hang}
           suKienDanhGia={suKienDanhGia}
         />
       ))}

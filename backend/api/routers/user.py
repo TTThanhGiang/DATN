@@ -384,7 +384,7 @@ def lay_thong_tin_khuyen_mai(ma_code: str, db: Session = Depends(get_db)):
         data={
             "ma_code": khuyen_mai.ma_code,
             "giam_gia": float(khuyen_mai.giam_gia),
-            "chi_nhanh_ap_dung": khuyen_mai.ma_chi_nhanh if khuyen_mai.ma_chi_nhanh else None,
+            "chi_nhanh_ap_dung": khuyen_mai.chi_nhanh.ten_chi_nhanh if khuyen_mai.ma_chi_nhanh else None,
             "ngay_bat_dau": khuyen_mai.ngay_bat_dau.isoformat(),
             "ngay_ket_thuc": khuyen_mai.ngay_ket_thuc.isoformat(),
             "san_pham_ap_dung": [sp.ma_san_pham for sp in khuyen_mai.san_pham_khuyen_mais]
@@ -745,6 +745,9 @@ def gui_danh_gia(
     current_user: NguoiDung = Depends(phan_quyen(khach_hang)),
     db: Session = Depends(get_db)
 ):
+    don_hang = db.query(DonHang).filter(DonHang.ma_don_hang == payload.ma_don_hang).first()
+    if don_hang.trang_thai != "HOAN_THANH":
+        return error_response(message="Đơn hàng chưa hoàn thành, không thể đánh giá sản phẩm")
     danh_gia = db.query(DanhGia).filter(
         DanhGia.ma_san_pham == payload.ma_san_pham,
         DanhGia.ma_nguoi_dung == current_user.ma_nguoi_dung 
@@ -785,13 +788,6 @@ def so_san_pham_trong_gio_hang(currents_user: NguoiDung = Depends(lay_nguoi_dung
 @router.get("/danh-gia/san-pham/{ma_san_pham}")
 def lay_danh_gia_san_pham(ma_san_pham: int, db: Session = Depends(get_db)):
     danh_gias = db.query(DanhGia).filter(DanhGia.ma_san_pham == ma_san_pham, DanhGia.trang_thai == "DA_DUYET").all()
-
-    total = len(danh_gias)
-    if not danh_gias:
-        return error_response(
-            message="Chưa có đánh giá cho sản phẩm này.", 
-            status_code=404
-        )
     result = []
     for dg in danh_gias:
         nguoi_dung = db.query(NguoiDung).filter(NguoiDung.ma_nguoi_dung == dg.ma_nguoi_dung).first()
